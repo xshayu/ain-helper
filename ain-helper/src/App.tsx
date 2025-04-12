@@ -15,7 +15,7 @@ const TABS: { key: Views; label: string }[] = [
   { key: 'farmingInputs', label: 'Seaweed Farming Inputs (Part 4)' },
   { key: 'investmentItems', label: 'Investment items (4.1)' },
   { key: 'seaweedProd', label: 'Seaweed Farming Production (Part 5)' },
-  { key: 'annIncome', label: 'Annual Income' },
+  { key: 'annIncome', label: 'Annual Income (Part 5 and 6)' },
   { key: 'seaweedMarket', label: 'Seaweed Farming Market (Part 6)' },
   { key: 'householdMember', label: 'Household members earning (Part 10.1)' }
 ];
