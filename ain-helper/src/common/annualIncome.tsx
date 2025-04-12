@@ -16,28 +16,28 @@ const formatNumber = (num: number | null | undefined, decimals = 2): string => {
 };
 
 // Type definition for Dropdown options
-interface DropdownOption {
-  id: number;
-  label: string;
-}
+// interface DropdownOption {
+//   id: number;
+//   label: string;
+// }
 
 // Options for dropdowns
-const buyerTypes: DropdownOption[] = [
-  { id: 1, label: "Consolidator/wholesaler" }, { id: 2, label: "Retailer" },
-  { id: 3, label: "Wholesaler" }, { id: 4, label: "Restaurant" },
-  { id: 5, label: "Hotel" }, { id: 6, label: "Broker" },
-  { id: 7, label: "Others (specify)" }
-];
-const buyerLocations: DropdownOption[] = [
-  { id: 1, label: "San Dionisio" }, { id: 2, label: "Estancia" },
-  { id: 3, label: "Concepcion" }, { id: 4, label: "Others (specify)" }
-];
-const paymentModes: DropdownOption[] = [
-  { id: 1, label: "Cash upon pick up" }, { id: 2, label: "Cash on delivery" },
-  { id: 3, label: "Credit - pick up" }, { id: 4, label: "Credit - delivery" },
-  { id: 5, label: "Bank transfer" }, { id: 6, label: "Gcash" },
-  { id: 7, label: "Others (specify)" }
-];
+// const buyerTypes: DropdownOption[] = [
+//   { id: 1, label: "Consolidator/wholesaler" }, { id: 2, label: "Retailer" },
+//   { id: 3, label: "Wholesaler" }, { id: 4, label: "Restaurant" },
+//   { id: 5, label: "Hotel" }, { id: 6, label: "Broker" },
+//   { id: 7, label: "Others (specify)" }
+// ];
+// const buyerLocations: DropdownOption[] = [
+//   { id: 1, label: "San Dionisio" }, { id: 2, label: "Estancia" },
+//   { id: 3, label: "Concepcion" }, { id: 4, label: "Others (specify)" }
+// ];
+// const paymentModes: DropdownOption[] = [
+//   { id: 1, label: "Cash upon pick up" }, { id: 2, label: "Cash on delivery" },
+//   { id: 3, label: "Credit - pick up" }, { id: 4, label: "Credit - delivery" },
+//   { id: 5, label: "Bank transfer" }, { id: 6, label: "Gcash" },
+//   { id: 7, label: "Others (specify)" }
+// ];
 
 // Interface defining the structure for each species' data
 interface SpeciesData {
