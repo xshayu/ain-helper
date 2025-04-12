@@ -3,25 +3,36 @@ import { useState } from 'react';
 import './App.css';
 import SeaweedSchedule from './common/seaweedSchedule';
 import SeaweedInputsForm from './common/seaweedFarmingInputs';
-import SeaweedProductionForm from './common/seaweedProductionForm';
 import AnnualIncomeCalculator from './common/annualIncome';
 import HouseholdIncomeCalculator from './common/householdIncome';
 
-type Views = 'main' | 'seaweed' | 'farmingInputs' | 'investmentItems' | 'seaweedProd' | 'annIncome' | 'seaweedMarket' | 'householdMember';
+const TABS = [
+  { key: 'main', label: 'Home', component: () => (
+    <section>
+      <h2 className="text-xl font-semibold mb-2">Welcome!</h2>
+      <p className="max-w-prose">This web application streamlines the data entry process for fisheries-related forms.</p><br />
+      <p className='max-w-prose italic text-teal-600 font-extrabold'>It's primarily meant for doing the repetitive calculations to save time 💚</p><br/>
+      <p>Select a form from the tabs above to get started.</p>
+    </section>
+  )},
+  { key: 'seaweed', label: 'Seaweed Production Schedule (Part 3)', component: SeaweedSchedule },
+  { key: 'farmingInputs', label: 'Seaweed Farming Inputs (Part 4)', component: SeaweedInputsForm },
+  { key: 'investmentItems', label: 'Investment items (4.1)', component: () => <section /> },
+  { key: 'annIncome', label: 'Annual Income (Part 5 and 6)', component: AnnualIncomeCalculator },
+  { key: 'householdMember', label: 'Household members earning (Part 10.1)', component: HouseholdIncomeCalculator }
+] as const;
 
-const TABS: { key: Views; label: string }[] = [
-  { key: 'main', label: 'Home' },
-  { key: 'seaweed', label: 'Seaweed Production Schedule (Part 3)' },
-  { key: 'farmingInputs', label: 'Seaweed Farming Inputs (Part 4)' },
-  { key: 'investmentItems', label: 'Investment items (4.1)' },
-  { key: 'seaweedProd', label: 'Seaweed Farming Production (Part 5)' },
-  { key: 'annIncome', label: 'Annual Income (Part 5 and 6)' },
-  { key: 'seaweedMarket', label: 'Seaweed Farming Market (Part 6)' },
-  { key: 'householdMember', label: 'Household members earning (Part 10.1)' }
-];
+type Views = typeof TABS[number]['key'];
 
 function App() {
   const [view, setView] = useState<Views>('main');
+  const [resetCounter, setResetCounter] = useState(0);
+
+  const reset = () => {
+    setResetCounter(prevCounter => prevCounter + 1);
+  };
+
+  const CurrentComponent = TABS.find(tab => tab.key === view)?.component || (() => null);
 
   return (
     <main className="bg-emerald-100 min-h-screen px-4 sm:px-8 lg:px-12 py-8 sm:py-12 lg:py-14 flex flex-col gap-4">
@@ -40,53 +51,14 @@ function App() {
             </option>
           ))}
         </select>
+        <button onClick={reset} className="ml-2 px-4 py-2 bg-teal-400 rounded-md hover:bg-teal-600 transition-colors">
+          Reset
+        </button>
       </div>
 
-      {/* View switch */}
-      {view === 'main' && (
-        <section>
-          <h2 className="text-xl font-semibold mb-2">Welcome!</h2>
-          <p className="max-w-prose">This web application streamlines the data entry process for fisheries-related forms.</p><br />
-          <p className='max-w-prose italic text-teal-600 font-extrabold'>It's primarily meant for doing the repetitive calculations to save time 💚</p><br/>
-          <p>Select a form from the tabs above to get started.</p>
-        </section>
-      )}
-
-      {view === 'seaweed' && (
-        <section>
-          <SeaweedSchedule />
-        </section>
-      )}
-
-      {view === 'farmingInputs' && (
-        <section>
-          <SeaweedInputsForm />
-        </section>
-      )}
-
-      {view === 'seaweedProd' && (
-        <section>
-          <SeaweedProductionForm />
-        </section>
-      )}
-
-      {view === 'annIncome' && (
-        <section>
-          <AnnualIncomeCalculator />
-        </section>
-      )}
-
-      {view === 'seaweedMarket' && (
-        <section>
-
-        </section>
-      )}
-
-      {view === 'householdMember' && (
-        <section>
-          <HouseholdIncomeCalculator />
-        </section>
-      )}
+      <section>
+        <CurrentComponent key={resetCounter} />
+      </section>
 
     </main>
   );
