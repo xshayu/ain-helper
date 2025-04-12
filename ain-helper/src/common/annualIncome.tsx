@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import LabelWithTooltip from './labelWithTooltip';
-import Section from './sectionComponent';
+import LabelWithTooltip from './ui/labelWithTooltip';
+import Section from './ui/sectionComponent';
 
 // Helper to format numbers for display
 const formatNumber = (num: number | null | undefined, decimals = 2): string => {

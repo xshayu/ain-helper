@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import LabelWithTooltip from './labelWithTooltip';
+import LabelWithTooltip from './ui/labelWithTooltip';
 
 const NUMBER_OF_WEEKS_PER_MONTH = 4.33;
 
