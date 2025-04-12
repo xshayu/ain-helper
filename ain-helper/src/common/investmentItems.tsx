@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import LabelWithTooltip from './labelWithTooltip';
+import LabelWithTooltip from './ui/labelWithTooltip';
 
 // Calculate the current year dynamically
 const CURRENT_YEAR = new Date().getFullYear();
@@ -11,7 +11,7 @@ interface InvestmentItem {
   yearPurchased: number | ''; // Allow empty string for initial state
   costWhenBought: number;
   costNow: number;
-  usefulLife: number; // Renamed from itemAge, represents "Life / Tuig nga magamit"
+  usefulLife: number; // Renamed from itemAge
   // Depreciation is calculated, not stored directly as user input
 }
 
@@ -207,22 +207,22 @@ const InvestmentItemsForm = () => {
                   Item Name
                 </th>
                 <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <LabelWithTooltip tooltip="Year purchased/constructed (Tuig binakal o gin obra)">
+                  <LabelWithTooltip tooltip="Year purchased/constructed">
                     Year Purchased
                   </LabelWithTooltip>
                 </th>
                 <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <LabelWithTooltip tooltip="Cost when bought (Gasto pagbakal/obra)">
+                  <LabelWithTooltip tooltip="Cost when bought">
                     Cost When Bought
                   </LabelWithTooltip>
                 </th>
                 <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <LabelWithTooltip tooltip="Current value (Gasto kun subong baklon). Note: Ask this when item is 3 years old or more.">
+                  <LabelWithTooltip tooltip="Current value. Note: Ask this when item is 3 years old or more.">
                     Cost Now
                   </LabelWithTooltip>
                 </th>
                 <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <LabelWithTooltip tooltip="Estimated useful life in years (Tuig nga magamit)">
+                  <LabelWithTooltip tooltip="Estimated useful life in years">
                     Life (Useful Years)
                   </LabelWithTooltip>
                 </th>

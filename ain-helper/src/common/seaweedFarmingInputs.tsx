@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import LabelWithTooltip from './labelWithTooltip';
+import LabelWithTooltip from './ui/labelWithTooltip';
 
 const formatCurrency = (num: number) =>
   '₱' + (Math.round(num * 100) / 100).toLocaleString('en-PH');
