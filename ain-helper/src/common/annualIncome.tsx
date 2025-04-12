@@ -275,7 +275,7 @@ const SeaweedFarmingCalculator: React.FC = () => {
 
   return (
     <div className="max-w-full mx-auto p-4 font-sans">
-      <h1 className="text-2xl font-bold mb-6 text-center text-teal-800">Seaweed Farming Income Calculator</h1>
+      <h1 className="text-xl font-bold mb-6 text-center text-teal-800">Seaweed Farming Income Calculator</h1>
 
       {/* Form 4 Equivalent - Production Data */}
       <Section title="PART 5: Seaweed Farming Production Data">

@@ -40,11 +40,11 @@ function App() {
       <h1 className="text-2xl font-bold text-slate-900">Fisheries Forms</h1>
 
       {/* Select Dropdown */}
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col md:flex-row gap-4">
         <select
           value={view}
           onChange={(e) => setView(e.target.value as Views)}
-          className="px-4 py-2 border-2 border-teal-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-4 py-2 border-2 border-teal-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 h-fit"
         >
           {TABS.map((tab) => (
             <option key={tab.key} value={tab.key}>
@@ -52,7 +52,7 @@ function App() {
             </option>
           ))}
         </select>
-        <button onClick={reset} className="ml-2 px-4 py-2 bg-teal-200 rounded-md hover:bg-teal-300 transition-colors">
+        <button onClick={reset} className="px-4 py-2 bg-teal-200 rounded-md hover:bg-teal-300 transition-colors h-fit">
           Reset to original values
         </button>
       </div>
