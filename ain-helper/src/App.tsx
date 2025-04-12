@@ -3,6 +3,7 @@ import { useState } from 'react';
 import './App.css';
 import SeaweedSchedule from './common/seaweedSchedule';
 import SeaweedInputsForm from './common/seaweedFarmingInputs';
+import InvestmentItemsForm from './common/investmentItems';
 import AnnualIncomeCalculator from './common/annualIncome';
 import HouseholdIncomeCalculator from './common/householdIncome';
 
@@ -17,7 +18,7 @@ const TABS = [
   )},
   { key: 'seaweed', label: 'Seaweed Production Schedule (Part 3)', component: SeaweedSchedule },
   { key: 'farmingInputs', label: 'Seaweed Farming Inputs (Part 4)', component: SeaweedInputsForm },
-  { key: 'investmentItems', label: 'Investment items (4.1)', component: () => <section /> },
+  { key: 'investmentItems', label: 'Investment items (4.1)', component: InvestmentItemsForm },
   { key: 'annIncome', label: 'Annual Income (Part 5 and 6)', component: AnnualIncomeCalculator },
   { key: 'householdMember', label: 'Household members earning (Part 10.1)', component: HouseholdIncomeCalculator }
 ] as const;
@@ -51,8 +52,8 @@ function App() {
             </option>
           ))}
         </select>
-        <button onClick={reset} className="ml-2 px-4 py-2 bg-teal-400 rounded-md hover:bg-teal-600 transition-colors">
-          Reset
+        <button onClick={reset} className="ml-2 px-4 py-2 bg-teal-200 rounded-md hover:bg-teal-300 transition-colors">
+          Reset to original values
         </button>
       </div>
 
