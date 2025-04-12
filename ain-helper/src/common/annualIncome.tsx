@@ -278,7 +278,7 @@ const SeaweedFarmingCalculator: React.FC = () => {
       <h1 className="text-2xl font-bold mb-6 text-center text-teal-800">Seaweed Farming Income Calculator</h1>
 
       {/* Form 4 Equivalent - Production Data */}
-      <Section title="PART 4: Seaweed Farming Production Data">
+      <Section title="PART 5: Seaweed Farming Production Data">
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse border text-sm">
             <thead className="bg-teal-50">
@@ -457,7 +457,7 @@ const SeaweedFarmingCalculator: React.FC = () => {
       </Section>
 
       {/* Form 5 Equivalent - Annual Income Calculation */}
-      <Section title="PART 5: Annual Income Calculation">
+      <Section title="Annual Income Calculation">
         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
           <h3 className="font-semibold mb-2">Calculation Logic:</h3>
           <p>Vol per Sale (Fresh/Dried) × Price (Fresh/Dried) = Revenue per Sale (Fresh/Dried)</p>
