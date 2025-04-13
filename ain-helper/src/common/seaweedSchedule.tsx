@@ -1,12 +1,6 @@
 import { useState } from 'react';
 import LabelWithTooltip from './ui/labelWithTooltip';
-
-const NUMBER_OF_WEEKS_PER_MONTH = 4.33;
-
-const formatNumber = (num: number) => {
-  const rounded = Math.round(num * 10) / 10;
-  return rounded.toString().replace(/\.0$/, '');
-};
+import { CONFIG, formatNumber } from '../utils';
 
 const SeaweedSchedule = () => {
   const [activityName, setActivityName] = useState('');
@@ -25,11 +19,11 @@ const SeaweedSchedule = () => {
     switch (frequencyType) {
       case 'once': return 1;
       case 'perMonth': return frequencyValue * monthsMarked;
-      case 'perWeek': return frequencyValue * monthsMarked * NUMBER_OF_WEEKS_PER_MONTH;
-      case 'everyXMonths': return Math.ceil(monthsMarked / everyXValue);
+      case 'perWeek': return frequencyValue * monthsMarked * CONFIG.NUMBER_OF_WEEKS_PER_MONTH;
+      case 'everyXMonths': return monthsMarked; // we ignore everyXValue because monthsMarked gives us the info
       case 'everyXWeeks': {
-        const totalWeeks = monthsMarked * NUMBER_OF_WEEKS_PER_MONTH;
-        return Math.ceil(totalWeeks / everyXValue);
+        const totalWeeks = monthsMarked * CONFIG.NUMBER_OF_WEEKS_PER_MONTH;
+        return totalWeeks / everyXValue;
       }
       default: return 0;
     }
@@ -38,10 +32,10 @@ const SeaweedSchedule = () => {
   const totalHoursMin = totalTimes * hoursMin;
   const totalHoursMax = totalTimes * hoursMax;
 
-  const frequencyDescription = 
+  const frequencyDescription =
     frequencyType === 'once'
       ? 'once'
-      : frequencyType.startsWith('every') 
+      : frequencyType.startsWith('every')
         ? `every ${everyXValue} ${frequencyType === 'everyXWeeks' ? 'weeks' : 'months'}`
         : `${frequencyValue} times per ${frequencyType === 'perWeek' ? 'week' : 'month'}`;
 
@@ -217,14 +211,19 @@ const SeaweedSchedule = () => {
         <h3 className="text-xl font-bold text-gray-800 border-b border-amber-200 pb-2">
           Annual Summary
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 bg-white rounded-lg shadow-sm border border-amber-200">
             <div className="text-gray-500 mb-2">Total Hours</div>
             <div className="text-2xl font-bold text-gray-800">
               {useHourRange
-                ? `${formatNumber(totalHoursMin)} - ${formatNumber(totalHoursMax)}`
+                ? `${formatNumber((totalHoursMin + totalHoursMax) / 2)}`
                 : formatNumber(totalHoursMin)}
+              {useHourRange && (
+                <span className="text-sm text-gray-400 ml-2">
+                  (min {formatNumber(totalHoursMin)} - max {formatNumber(totalHoursMax)})
+                </span>
+              )}
             </div>
           </div>
           <div className="p-4 bg-green-50 rounded-lg shadow-sm border border-green-200">
@@ -242,13 +241,49 @@ const SeaweedSchedule = () => {
         </div>
 
         <div className="p-4 bg-white rounded-lg border border-gray-200 text-sm">
-          <p className="mb-2 font-medium">Summary Statement:</p>
+          <p className='font-medium text-gray-700'>
+            Formula
+          </p>
           <p>
-            The activity "<strong>{activityName || 'Unnamed Activity'}</strong>" 
-            requires <strong>{useHourRange ? 
-              `${formatNumber(totalHoursMin)} - ${formatNumber(totalHoursMax)}` : 
-              formatNumber(totalHoursMin)} hours</strong> annually. 
-            It occurs <strong>{frequencyDescription}</strong> over 
+            {useHourRange && (
+              <div className="text-gray-500 mb-1 text-xs">
+                Using average of min ({hoursMin}) and max ({hoursMax}) hours: {(hoursMin + hoursMax) / 2} hours per activity
+              </div>
+            )}
+            <strong>Total Hours = </strong>
+            {(() => {
+              const hoursPerActivity = useHourRange ? (hoursMin + hoursMax) / 2 : hoursMin;
+              const totalHours = useHourRange ? (totalHoursMin + totalHoursMax) / 2 : totalHoursMin;
+
+              switch (frequencyType) {
+                case 'once':
+                  return <span>1 × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
+                case 'perMonth':
+                  return <span>{frequencyValue} times × {monthsMarked} months × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
+                case 'perWeek':
+                  return <span>{frequencyValue} times × {monthsMarked} months × {CONFIG.NUMBER_OF_WEEKS_PER_MONTH} weeks/month × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
+                case 'everyXMonths':
+                  return <span>{monthsMarked} months × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
+                case 'everyXWeeks':
+                  return <span>({monthsMarked} months × {CONFIG.NUMBER_OF_WEEKS_PER_MONTH} weeks/month) ÷ {everyXValue} × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
+                default:
+                  return null;
+              }
+            })()}
+          </p>
+          <p className="mt-3 font-medium text-gray-700">Summary Statement</p>
+          <p>
+            The activity "<strong>{activityName || 'Unnamed Activity'}</strong>"
+            requires <strong>
+              {useHourRange
+                ? `${formatNumber((totalHoursMin + totalHoursMax) / 2)}`
+                : formatNumber(totalHoursMin)} hours</strong>
+            {useHourRange && (
+              <span className="text-gray-400">
+                &nbsp;(min {formatNumber(totalHoursMin)} - max {formatNumber(totalHoursMax)})
+              </span>
+            )}
+            . It occurs <strong>{frequencyDescription}</strong> over
             <strong> {monthsMarked} month(s)</strong> each year.
           </p>
         </div>
