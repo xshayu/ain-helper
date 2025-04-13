@@ -1,60 +1,57 @@
-import React, { useState, useCallback, useEffect } from 'react'; // Import useEffect
-import LabelWithTooltip from './ui/labelWithTooltip';
+import React, { useState, useCallback, useEffect } from 'react';
+import LabelWithTooltip from './ui/labelWithTooltip'; // Assuming these UI components exist
 import Section from './ui/sectionComponent';
-import { formatNumber, CONFIG } from '../utils'; // Assuming CONFIG is exported
+import { formatNumber, CONFIG } from '../utils'; // Assuming utils exist
 
 // Define the frequency type
 type FrequencyType = 'perMonth' | 'perWeek' | 'everyXMonths' | 'everyXWeeks' | 'once' | 'perYear';
 
-// Updated Interface for SpeciesData
+// Interface for SpeciesData (Input State) - No change needed here
 interface SpeciesData {
   id: number;
   name: string;
-  // Frequency fields replace timesPerSixMonths
   frequencyType: FrequencyType;
-  frequencyValue: number; // Used for perMonth, perWeek, perYear
-  everyXValue: number;    // Used for everyXMonths, everyXWeeks
-  monthsMarked: number;   // How many months per year sales *can* happen (1-12)
-  // Other fields remain
+  frequencyValue: number;
+  everyXValue: number;
+  monthsMarked: number;
   freshVolume: number;
   freshPrice: number;
-  ratioInput: string;
-  freshToDryRatio: number;
+  freshWeightForDrying: number;
   driedVolume: number;
   driedPrice: number;
   consumedVolume: number;
   processedVolume: number;
 }
 
-// Interface for calculated data (remains the same structure)
+// Interface for calculated data (Derived State) - Remove effective ratio
 interface CalculatedSpeciesData extends SpeciesData {
+  // effectiveFreshToDryRatio: number; // REMOVED
+  totalHarvestVolume: number;
   freshRevenuePerCycle: number;
   driedRevenuePerCycle: number;
   totalRevenuePerCycle: number;
-  salesPerYear: number; // This is now calculated differently
+  salesPerYear: number;
   annualRevenue: number;
 }
 
-// Updated initial state
+// Initial state - No change needed here
 const initialSpeciesData: Omit<SpeciesData, 'id'> = {
   name: '',
-  // Default Frequency: Sold twice per year
   frequencyType: 'perYear',
   frequencyValue: 2,
-  everyXValue: 1, // Default, not used for 'perYear'
-  monthsMarked: 12, // Default, applies to whole year
-  // Other fields
+  everyXValue: 1,
+  monthsMarked: 12,
   freshVolume: 0,
   freshPrice: 0,
-  ratioInput: '5',
-  freshToDryRatio: 5,
+  freshWeightForDrying: 0,
   driedVolume: 0,
   driedPrice: 0,
   consumedVolume: 0,
   processedVolume: 0,
 };
 
-// parseRatio helper function (keep as is)
+// Helper functions (parseRatio, calculateEffectiveRatio, calculateAnnualSales, getFrequencyDescription)
+// remain the same as in the previous version.
 const parseRatio = (input: string | number): number => {
   const trimmed = String(input).trim();
   if (trimmed.includes(':')) {
@@ -72,57 +69,35 @@ const parseRatio = (input: string | number): number => {
       return num;
     }
   }
-  return 1; // Default ratio if parsing fails or is invalid
+  return Infinity;
 };
 
-// --- NEW: Helper function to calculate annual sales ---
 const calculateAnnualSales = (species: Pick<SpeciesData, 'frequencyType' | 'frequencyValue' | 'everyXValue' | 'monthsMarked'>): number => {
   const { frequencyType, frequencyValue, everyXValue, monthsMarked } = species;
-
-  // Ensure monthsMarked is within valid range
   const validMonths = Math.max(1, Math.min(12, monthsMarked || 12));
-  // Ensure values are positive where needed
   const val = Math.max(1, frequencyValue || 1);
   const xVal = Math.max(1, everyXValue || 1);
+  const weeksPerMonth = CONFIG?.NUMBER_OF_WEEKS_PER_MONTH ?? (52/12);
 
   switch (frequencyType) {
-    case 'once':
-      return 1;
-    case 'perYear':
-      return val; // Directly use frequencyValue as annual count
-    case 'perMonth':
-      // 'frequencyValue' times per month, only during 'validMonths'
-      return val * validMonths;
-    case 'perWeek':
-      // 'frequencyValue' times per week, only during 'validMonths'
-      // Use a more standard 4.33 weeks/month if CONFIG isn't defined or you prefer
-      const weeksPerMonth = CONFIG?.NUMBER_OF_WEEKS_PER_MONTH ?? (52/12);
-      return val * validMonths * weeksPerMonth;
-    case 'everyXMonths':
-      // How many full 'everyXValue' month intervals fit within 'validMonths'?
-      // This calculates occurrences *within* the active months.
-      if (xVal <= 0) return 0; // Avoid division by zero
-      // Ensure at least one sale if monthsMarked >= xVal
-      return validMonths >= xVal ? Math.floor(validMonths / xVal) : 0;
+    case 'once': return 1;
+    case 'perYear': return val;
+    case 'perMonth': return val * validMonths;
+    case 'perWeek': return val * validMonths * weeksPerMonth;
+    case 'everyXMonths': return validMonths >= xVal ? Math.floor(validMonths / xVal) : 0;
     case 'everyXWeeks':
-      // How many full 'everyXValue' week intervals fit within the weeks of 'validMonths'?
-      if (xVal <= 0) return 0; // Avoid division by zero
-      const weeksPerMonthForCalc = CONFIG?.NUMBER_OF_WEEKS_PER_MONTH ?? (52/12);
-      const totalWeeksInMarkedMonths = validMonths * weeksPerMonthForCalc;
-       // Ensure at least one sale if totalWeeks >= xVal
+      const totalWeeksInMarkedMonths = validMonths * weeksPerMonth;
       return totalWeeksInMarkedMonths >= xVal ? Math.floor(totalWeeksInMarkedMonths / xVal) : 0;
-    default:
-      return 0;
+    default: return 0;
   }
 };
 
-// --- NEW: Helper function to describe frequency ---
 const getFrequencyDescription = (species: Pick<SpeciesData, 'frequencyType' | 'frequencyValue' | 'everyXValue' | 'monthsMarked'>): string => {
     const { frequencyType, frequencyValue, everyXValue, monthsMarked } = species;
     const val = frequencyValue || 1;
     const xVal = everyXValue || 1;
     const months = monthsMarked || 12;
-    const monthText = `${months} ${months === 1 ? 'mo' : 'mos'}`; // Handle plural 'mo'
+    const monthText = `${months} ${months === 1 ? 'mo' : 'mos'}`;
 
     switch (frequencyType) {
         case 'once': return `Once (over ${monthText})`;
@@ -135,33 +110,30 @@ const getFrequencyDescription = (species: Pick<SpeciesData, 'frequencyType' | 'f
     }
 };
 
+
 // --- React Component ---
 const SeaweedFarmingCalculator: React.FC = () => {
   const [speciesData, setSpeciesData] = useState<SpeciesData[]>([
     { ...initialSpeciesData, id: Date.now(), name: 'Kappaphycus alvarezii' }
   ]);
 
-  // --- NEW: State for Modal ---
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSpeciesId, setEditingSpeciesId] = useState<number | null>(null);
-  // Temporary state within the modal form
+  // State for Frequency Modal
+  const [isFrequencyModalOpen, setIsFrequencyModalOpen] = useState(false);
+  const [editingFrequencySpeciesId, setEditingFrequencySpeciesId] = useState<number | null>(null);
   const [modalFrequency, setModalFrequency] = useState<Pick<SpeciesData, 'frequencyType' | 'frequencyValue' | 'everyXValue' | 'monthsMarked'>>({
-    frequencyType: 'perYear',
-    frequencyValue: 2,
-    everyXValue: 1,
-    monthsMarked: 12,
+    frequencyType: 'perYear', frequencyValue: 2, everyXValue: 1, monthsMarked: 12,
   });
 
+  // State for Dried Volume Helper Modal
+  const [isDriedVolumeModalOpen, setIsDriedVolumeModalOpen] = useState(false);
+  const [editingDriedVolumeSpeciesId, setEditingDriedVolumeSpeciesId] = useState<number | null>(null);
+  const [modalRatioInput, setModalRatioInput] = useState<string>('5');
+
   const addSpecies = () => {
-    const newSpecies: SpeciesData = {
-      ...initialSpeciesData,
-      id: Date.now() + speciesData.length
-    };
-    // Calculate initial dried volume (no change needed here)
-    newSpecies.driedVolume = (newSpecies.freshToDryRatio > 0)
-      ? newSpecies.freshVolume / newSpecies.freshToDryRatio
-      : 0;
-    setSpeciesData([...speciesData, newSpecies]);
+    setSpeciesData(currentData => [
+        ...currentData,
+        { ...initialSpeciesData, id: Date.now() + currentData.length }
+    ]);
   };
 
   const removeSpecies = (idToRemove: number) => {
@@ -170,142 +142,109 @@ const SeaweedFarmingCalculator: React.FC = () => {
     }
   };
 
-  // --- Update Handler ---
+  // --- Update Handler (remains the same) ---
   const updateSpeciesField = useCallback((idToUpdate: number, field: keyof SpeciesData, value: string | number) => {
-    setSpeciesData(currentData => {
-      return currentData.map(species => {
+    setSpeciesData(currentData =>
+      currentData.map(species => {
         if (species.id !== idToUpdate) {
           return species;
         }
-
-        const updatedSpecies: SpeciesData = { ...species };
-
+        const updatedSpecies = { ...species };
         switch (field) {
-          case 'frequencyType':
-            updatedSpecies.frequencyType = value as FrequencyType;
+          case 'frequencyType': updatedSpecies.frequencyType = value as FrequencyType; break;
+          case 'frequencyValue': case 'everyXValue': case 'monthsMarked':
+            let numValFreq = parseInt(String(value), 10) || 0;
+            if (field === 'monthsMarked') numValFreq = Math.max(1, Math.min(12, numValFreq));
+            else numValFreq = Math.max(1, numValFreq);
+            updatedSpecies[field] = numValFreq;
             break;
-          case 'frequencyValue':
-          case 'everyXValue':
-          case 'monthsMarked':
-            updatedSpecies[field] = parseInt(String(value), 10) || 0;
-            if (field === 'monthsMarked') {
-                updatedSpecies.monthsMarked = Math.max(1, Math.min(12, updatedSpecies.monthsMarked));
-            }
-             if (field === 'frequencyValue' || field === 'everyXValue') {
-                updatedSpecies[field] = Math.max(1, updatedSpecies[field]); // Ensure at least 1
-            }
-            break;
-
-          case 'freshVolume':
-            const numValue = parseFloat(String(value)) || 0;
-            updatedSpecies.freshVolume = numValue;
-            updatedSpecies.driedVolume = (updatedSpecies.freshToDryRatio > 0 && updatedSpecies.freshToDryRatio !== Infinity)
-              ? numValue / updatedSpecies.freshToDryRatio
-              : 0;
-            break;
-
-          case 'ratioInput':
-            updatedSpecies.ratioInput = String(value);
-            const newNumericRatio = parseRatio(String(value));
-            updatedSpecies.freshToDryRatio = newNumericRatio;
-            updatedSpecies.driedVolume = (newNumericRatio > 0 && newNumericRatio !== Infinity)
-              ? updatedSpecies.freshVolume / newNumericRatio
-              : 0;
-            break;
-
-          case 'driedVolume':
-            const driedNumValue = parseFloat(String(value)) || 0;
-            updatedSpecies.driedVolume = driedNumValue;
-            if (driedNumValue > 0 && updatedSpecies.freshVolume > 0) {
-              const calculatedRatio = updatedSpecies.freshVolume / driedNumValue;
-              updatedSpecies.freshToDryRatio = calculatedRatio;
-              // Update ratio input to reflect the change, formatted nicely
-              updatedSpecies.ratioInput = formatNumber(calculatedRatio, 1) + ':1'; // Or just the number
-            } else if (driedNumValue > 0 && updatedSpecies.freshVolume <= 0) {
-               // Cannot calculate ratio if fresh volume is 0
-               updatedSpecies.freshToDryRatio = Infinity; // Or keep previous? Or set to 1? Decide behavior.
-               // updatedSpecies.ratioInput = "∞"; // Indicate infinity or uncalculable
-            } else if (driedNumValue <= 0) {
-                // If dried volume is set to 0, ratio might become infinity or 0/0.
-                // Maybe revert to the ratio derived from ratioInput if available?
-                const ratioFromInput = parseRatio(updatedSpecies.ratioInput);
-                updatedSpecies.freshToDryRatio = ratioFromInput;
-                 // Or simply set driedVolume to 0 and leave ratio as is? Depends on desired UX.
-            }
-            break;
-
-          case 'freshPrice':
-          case 'driedPrice':
-          case 'consumedVolume':
-          case 'processedVolume':
+          case 'freshVolume': case 'freshPrice': case 'freshWeightForDrying':
+          case 'driedVolume': case 'driedPrice': case 'consumedVolume': case 'processedVolume':
             updatedSpecies[field] = parseFloat(String(value)) || 0;
             break;
-
-          default: // Handles 'name'
-            (updatedSpecies[field] as any) = String(value);
-            break;
+          case 'name': updatedSpecies.name = String(value); break;
+          default: break;
         }
-
         return updatedSpecies;
-      });
-    });
-  }, []); // Keep empty dependency array
+      })
+    );
+  }, []);
 
-  // --- Modal Handling Functions ---
+  // --- Frequency Modal Handlers (remain the same) ---
   const openFrequencyModal = (id: number) => {
     const speciesToEdit = speciesData.find(s => s.id === id);
     if (speciesToEdit) {
-      setEditingSpeciesId(id);
+      setEditingFrequencySpeciesId(id);
       setModalFrequency({
         frequencyType: speciesToEdit.frequencyType,
         frequencyValue: speciesToEdit.frequencyValue,
         everyXValue: speciesToEdit.everyXValue,
         monthsMarked: speciesToEdit.monthsMarked,
       });
-      setIsModalOpen(true);
+      setIsFrequencyModalOpen(true);
     }
   };
-
-  // --- NEW: Wrap closeFrequencyModal in useCallback ---
   const closeFrequencyModal = useCallback(() => {
-    setIsModalOpen(false);
-    setEditingSpeciesId(null);
-    // Optional: Reset modal form state if you don't want it to persist
-    // setModalFrequency({ frequencyType: 'perYear', frequencyValue: 2, everyXValue: 1, monthsMarked: 12 });
-  }, []); // No dependencies needed as it only uses state setters
-
+    setIsFrequencyModalOpen(false);
+    setEditingFrequencySpeciesId(null);
+  }, []);
   const handleModalFrequencyChange = (field: keyof typeof modalFrequency, value: string | number) => {
-    setModalFrequency(prev => {
+    setModalFrequency(prev => { /* logic unchanged */
         const updated = { ...prev };
         if (field === 'frequencyType') {
             updated.frequencyType = value as FrequencyType;
-            // Optional: Reset other values when type changes for clarity
-            // if (value === 'perYear' || value === 'once') {
-            //     updated.frequencyValue = (value === 'perYear' ? 2 : 1);
-            // } else {
-            //     updated.frequencyValue = 1;
-            // }
-            // updated.everyXValue = 1;
         } else {
             let numValue = parseInt(String(value), 10) || 0;
-             // Add validation/clamping
             if (field === 'monthsMarked') numValue = Math.max(1, Math.min(12, numValue));
-            if (field === 'frequencyValue' || field === 'everyXValue') numValue = Math.max(1, numValue); // Min 1
+            else numValue = Math.max(1, numValue);
             updated[field] = numValue;
         }
         return updated;
     });
   };
-
-  const saveFrequencyChanges = () => {
-    if (editingSpeciesId !== null) {
-      updateSpeciesField(editingSpeciesId, 'frequencyType', modalFrequency.frequencyType);
-      updateSpeciesField(editingSpeciesId, 'frequencyValue', modalFrequency.frequencyValue);
-      updateSpeciesField(editingSpeciesId, 'everyXValue', modalFrequency.everyXValue);
-      updateSpeciesField(editingSpeciesId, 'monthsMarked', modalFrequency.monthsMarked);
+   const saveFrequencyChanges = () => { /* logic unchanged */
+    if (editingFrequencySpeciesId !== null) {
+      updateSpeciesField(editingFrequencySpeciesId, 'frequencyType', modalFrequency.frequencyType);
+      updateSpeciesField(editingFrequencySpeciesId, 'frequencyValue', modalFrequency.frequencyValue);
+      updateSpeciesField(editingFrequencySpeciesId, 'everyXValue', modalFrequency.everyXValue);
+      updateSpeciesField(editingFrequencySpeciesId, 'monthsMarked', modalFrequency.monthsMarked);
     }
     closeFrequencyModal();
   };
+
+  // --- Dried Volume Modal Handlers (remain the same) ---
+   const openDriedVolumeModal = (id: number) => {
+     const speciesToEdit = speciesData.find(s => s.id === id);
+     if (speciesToEdit) {
+       setEditingDriedVolumeSpeciesId(id);
+       // Calculate effective ratio just for pre-filling the modal
+       const currentRatio = (speciesToEdit.driedVolume > 0 && speciesToEdit.freshWeightForDrying >= 0)
+           ? speciesToEdit.freshWeightForDrying / speciesToEdit.driedVolume
+           : Infinity;
+       setModalRatioInput(isFinite(currentRatio) ? formatNumber(currentRatio, 1) : '5');
+       setIsDriedVolumeModalOpen(true);
+     }
+   };
+   const closeDriedVolumeModal = useCallback(() => {
+    setIsDriedVolumeModalOpen(false);
+    setEditingDriedVolumeSpeciesId(null);
+   }, []);
+   const handleModalRatioInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+       setModalRatioInput(e.target.value);
+   };
+   const saveDriedVolumeFromRatio = () => { /* logic unchanged */
+       if (editingDriedVolumeSpeciesId === null) return;
+       const speciesToUpdate = speciesData.find(s => s.id === editingDriedVolumeSpeciesId);
+       if (!speciesToUpdate) return;
+       const ratio = parseRatio(modalRatioInput);
+       if (isFinite(ratio) && ratio > 0) {
+           const calculatedDriedVolume = speciesToUpdate.freshWeightForDrying / ratio;
+           updateSpeciesField(editingDriedVolumeSpeciesId, 'driedVolume', formatNumber(calculatedDriedVolume, 2));
+       } else {
+           console.warn("Invalid ratio entered in modal:", modalRatioInput);
+       }
+       closeDriedVolumeModal();
+   };
 
 
   // --- Calculation Function ---
@@ -315,20 +254,25 @@ const SeaweedFarmingCalculator: React.FC = () => {
     const calculatedData: CalculatedSpeciesData[] = speciesData.map(species => {
       const salesPerYear = calculateAnnualSales(species);
 
+      // Calculate Total Harvest Volume based on inputs
+      const totalHarvestVolume = species.freshVolume + species.freshWeightForDrying + species.consumedVolume + species.processedVolume;
+
+      // Calculate revenues based on current volumes and prices
       const freshRevenuePerCycle = species.freshVolume * species.freshPrice;
       const driedRevenuePerCycle = species.driedVolume * species.driedPrice;
       const totalRevenuePerCycle = freshRevenuePerCycle + driedRevenuePerCycle;
-
       const annualRevenue = totalRevenuePerCycle * salesPerYear;
 
       totalAnnualIncome += annualRevenue;
 
       return {
         ...species,
+        // effectiveFreshToDryRatio, // REMOVED
+        totalHarvestVolume,
         freshRevenuePerCycle,
         driedRevenuePerCycle,
         totalRevenuePerCycle,
-        salesPerYear, // Store the calculated value
+        salesPerYear,
         annualRevenue
       };
     });
@@ -336,9 +280,9 @@ const SeaweedFarmingCalculator: React.FC = () => {
     return { calculatedData, totalAnnualIncome };
   };
 
-  const { calculatedData, totalAnnualIncome } = calculateTotals(); // Calculation runs on every render
+  const { calculatedData, totalAnnualIncome } = calculateTotals();
 
-  // Generic input handlers remain the same
+  // Generic input handlers (remain the same)
    const handleNumericInputChange = (id: number, field: keyof SpeciesData, e: React.ChangeEvent<HTMLInputElement>) => {
       updateSpeciesField(id, field, e.target.value);
   };
@@ -346,108 +290,162 @@ const SeaweedFarmingCalculator: React.FC = () => {
        updateSpeciesField(id, field, e.target.value);
    };
 
-   // --- NEW: useEffect for Escape key handling ---
+   // --- UseEffect for Escape key handling (remains the same) ---
    useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        closeFrequencyModal();
+          if (isFrequencyModalOpen) closeFrequencyModal();
+          if (isDriedVolumeModalOpen) closeDriedVolumeModal();
       }
     };
-
-    if (isModalOpen) {
+    if (isFrequencyModalOpen || isDriedVolumeModalOpen) {
       document.addEventListener('keydown', handleKeyDown);
     }
-
-    // Cleanup function: remove listener when modal closes or component unmounts
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isModalOpen, closeFrequencyModal]); // Dependencies
+  }, [isFrequencyModalOpen, isDriedVolumeModalOpen, closeFrequencyModal, closeDriedVolumeModal]);
 
 
   // --- Render JSX ---
   return (
     <div className="max-w-full mx-auto p-4 font-sans">
-      {/* ... (rest of the component preamble, table headers etc. remains the same) ... */}
       <h1 className="text-xl font-bold mb-6 text-center text-teal-800">Seaweed Farming Income Calculator</h1>
 
-      {/* Form 4 Equivalent - Production Data */}
+      {/* Part 5: Production Data Table - UPDATED STRUCTURE */}
       <Section title="PART 5: Seaweed Farming Production Data">
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse border text-sm">
+          {/* Apply small text size to table for compactness */}
+          <table className="min-w-full border-collapse border text-xs">
             <thead className="bg-teal-50">
               <tr>
-                <th className="border p-2"><LabelWithTooltip tooltip="Name of the seaweed species">Species</LabelWithTooltip></th>
-                <th className="border p-2">
-                  <LabelWithTooltip tooltip="Frequency of sales per year. Click 'Edit' to configure details (e.g., per month, per week, specific number of times).">
+                {/* UPDATED Headers & Order */}
+                <th className="border p-1.5 align-bottom"><LabelWithTooltip tooltip="Name of the seaweed species">Species</LabelWithTooltip></th>
+                <th className="border p-1.5 align-bottom">
+                  <LabelWithTooltip tooltip="Frequency of sales per year. Click 'Edit' to configure details.">
                     Sales Frequency (per Year)
                   </LabelWithTooltip>
                 </th>
-                <th className="border p-2"><LabelWithTooltip tooltip="Expected FRESH seaweed volume SOLD per sale event/cycle, kg">Fresh Vol Sold (kg)</LabelWithTooltip></th>
-                <th className="border p-2"><LabelWithTooltip tooltip="Selling price per kg FRESH wet seaweed">Fresh Price (₱/kg)</LabelWithTooltip></th>
-                <th className="border p-2"><LabelWithTooltip tooltip="Ratio of FRESH weight to DRIED weight. Enter as a number (e.g., 5) or ratio (e.g., 7:1). Changing this or Fresh Volume updates Dried Volume.">Fresh:Dry Ratio</LabelWithTooltip></th>
-                <th className="border p-2"><LabelWithTooltip tooltip="Expected volume of DRIED seaweed SOLD per sale event/cycle, kg. Changing this updates the effective Fresh:Dry ratio based on Fresh Volume.">Dried Vol Sold (kg)</LabelWithTooltip></th>
-                <th className="border p-2"><LabelWithTooltip tooltip="Selling price per kg DRIED seaweed">Dried Price (₱/kg)</LabelWithTooltip></th>
-                <th className="border p-2"><LabelWithTooltip tooltip="How many kg was eaten/consumed (per cycle/harvest)? Optional data.">Consumed (kg)</LabelWithTooltip></th>
-                <th className="border p-2"><LabelWithTooltip tooltip="How many kg was processed into chips, etc. (per cycle/harvest)? Optional data.">Processed (kg)</LabelWithTooltip></th>
-                <th className="border p-2">Actions</th>
+                <th className="border p-1.5 align-bottom">
+                    <LabelWithTooltip tooltip="Volume (kg) and Price (₱/kg) of FRESH seaweed SOLD per cycle.">
+                        Fresh Sold (kg / ₱)
+                    </LabelWithTooltip>
+                </th>
+                <th className="border p-1.5 align-bottom">
+                    <LabelWithTooltip tooltip="Volume (kg) and Price (₱/kg) of DRIED seaweed SOLD per cycle. Click 'Calc' to determine Volume from Fresh Wt. & Ratio.">
+                        Dried Sold (kg / ₱)
+                    </LabelWithTooltip>
+                </th>
+                <th className="border p-1.5 align-bottom"><LabelWithTooltip tooltip="Initial FRESH weight allocated for drying per cycle (kg)">Fresh Wt. for Drying (kg)</LabelWithTooltip></th>
+                <th className="border p-1.5 align-bottom"><LabelWithTooltip tooltip="Volume eaten/consumed per cycle (kg). Optional.">Consumed (kg)</LabelWithTooltip></th>
+                <th className="border p-1.5 align-bottom"><LabelWithTooltip tooltip="Volume processed into other products per cycle (kg). Optional.">Processed (kg)</LabelWithTooltip></th>
+                <th className="border p-1.5 align-bottom bg-gray-50">
+                  <LabelWithTooltip tooltip="Calculated total FRESH weight harvested per cycle = Sold Fresh + Fresh Wt. for Drying + Consumed + Processed">
+                     Total Harvest (kg/cycle)
+                  </LabelWithTooltip>
+                </th>
+                <th className="border p-1.5 align-bottom">Actions</th>
               </tr>
             </thead>
             <tbody>
               {calculatedData.map((species) => (
                 <tr key={species.id}>
                   {/* Species Name */}
-                  <td className="border p-2">
-                    <input
-                      type="text"
-                      className="w-full p-1 border rounded min-w-[150px]"
-                      placeholder="e.g., Kappaphycus alvarezii"
-                      value={species.name}
-                      onChange={(e) => handleTextInputChange(species.id, 'name', e)}
-                    />
+                  <td className="border p-1.5 align-middle">
+                    <input type="text" className="w-full p-1 border rounded min-w-[120px]" placeholder="e.g., Kappaphycus" value={species.name} onChange={(e) => handleTextInputChange(species.id, 'name', e)} />
                   </td>
-                  {/* Frequency Cell */}
-                  <td className="border p-2 text-center align-middle">
-                    <div className='flex flex-col items-center gap-1'>
-                      <span className="text-xs whitespace-nowrap">
-                        {getFrequencyDescription(species)}
-                      </span>
-                      <span className='text-xs font-semibold'>
-                        (~{formatNumber(species.salesPerYear, 1)} sales/yr)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => openFrequencyModal(species.id)}
-                        className="mt-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded border border-blue-300"
-                      >
-                        Edit Freq.
+                  {/* Frequency */}
+                  <td className="border p-1.5 text-center align-middle">
+                    <div className='flex flex-col items-center gap-0.5'> {/* Reduced gap */}
+                      <span className="whitespace-nowrap">{getFrequencyDescription(species)}</span>
+                      <span className='font-semibold'>(~{formatNumber(species.salesPerYear, 1)}/yr)</span>
+                      <button type="button" onClick={() => openFrequencyModal(species.id)} className="mt-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded border border-blue-300 text-[10px]"> {/* Smaller button */}
+                          Edit Freq.
                       </button>
                     </div>
                   </td>
-                  {/* Other cells */}
-                  <td className="border p-2">
-                    <input type="number" min="0" step="any" className="w-24 p-1 border rounded" value={species.freshVolume} onChange={(e) => handleNumericInputChange(species.id, 'freshVolume', e)} />
+                  {/* Combined Fresh Vol/Price Cell */}
+                  <td className="border p-1.5 align-middle">
+                     <div className="flex flex-col space-y-1"> {/* Stack items vertically */}
+                         {/* Fresh Volume Input */}
+                         <div className="flex items-center">
+                             <span className="w-6 text-gray-500 mr-1">kg:</span>
+                             <input
+                                type="number" min="0" step="any"
+                                className="w-20 p-1 border rounded"
+                                value={species.freshVolume}
+                                onChange={(e) => handleNumericInputChange(species.id, 'freshVolume', e)}
+                                aria-label="Fresh Volume Sold (kg)"
+                             />
+                         </div>
+                          {/* Fresh Price Input */}
+                         <div className="flex items-center">
+                            <span className="w-6 text-gray-500 mr-1">₱:</span>
+                            <input
+                                type="number" min="0" step="any"
+                                className="w-20 p-1 border rounded"
+                                value={species.freshPrice}
+                                onChange={(e) => handleNumericInputChange(species.id, 'freshPrice', e)}
+                                aria-label="Fresh Price (per kg)"
+                            />
+                         </div>
+                     </div>
                   </td>
-                   <td className="border p-2">
-                    <input type="number" min="0" step="any" className="w-24 p-1 border rounded" value={species.freshPrice} onChange={(e) => handleNumericInputChange(species.id, 'freshPrice', e)} />
+                   {/* Combined Dried Vol/Price Cell */}
+                  <td className="border p-1.5 align-middle">
+                     <div className="flex flex-col space-y-1"> {/* Stack items vertically */}
+                         {/* Dried Volume Input with Calc Button */}
+                         <div className="flex items-center">
+                              <span className="w-6 text-gray-500 mr-1">kg:</span>
+                              <div className="flex items-center space-x-1">
+                                 <input
+                                     type="number" min="0" step="any"
+                                     className="w-16 p-1 border rounded" /* Slightly narrower */
+                                     value={species.driedVolume}
+                                     onChange={(e) => handleNumericInputChange(species.id, 'driedVolume', e)}
+                                     aria-label="Dried Volume Sold (kg)"
+                                 />
+                                 <button
+                                     type="button"
+                                     onClick={() => openDriedVolumeModal(species.id)}
+                                     className="px-1 py-0.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded border border-indigo-300 text-[10px]" /* Smaller */
+                                     title="Calculate Dried Volume from Ratio"
+                                 >
+                                     Calc
+                                 </button>
+                             </div>
+                         </div>
+                         {/* Dried Price Input */}
+                         <div className="flex items-center">
+                             <span className="w-6 text-gray-500 mr-1">₱:</span>
+                             <input
+                                 type="number" min="0" step="any"
+                                 className="w-20 p-1 border rounded"
+                                 value={species.driedPrice}
+                                 onChange={(e) => handleNumericInputChange(species.id, 'driedPrice', e)}
+                                 aria-label="Dried Price (per kg)"
+                             />
+                         </div>
+                     </div>
                   </td>
-                  <td className="border p-2">
-                     <input type="text" className="w-20 p-1 border rounded" placeholder="e.g., 5 or 7:1" value={species.ratioInput} onChange={(e) => handleTextInputChange(species.id, 'ratioInput', e)} />
+                  {/* Fresh Wt. for Drying */}
+                  <td className="border p-1.5 align-middle">
+                     <input type="number" min="0" step="any" className="w-20 p-1 border rounded" value={species.freshWeightForDrying} onChange={(e) => handleNumericInputChange(species.id, 'freshWeightForDrying', e)} />
                   </td>
-                   <td className="border p-2">
-                    <input type="number" min="0" step="any" className="w-24 p-1 border rounded" value={species.driedVolume} onChange={(e) => handleNumericInputChange(species.id, 'driedVolume', e)} />
+                  {/* Consumed */}
+                  <td className="border p-1.5 align-middle">
+                     <input type="number" min="0" step="any" className="w-20 p-1 border rounded" value={species.consumedVolume} onChange={(e) => handleNumericInputChange(species.id, 'consumedVolume', e)} />
                   </td>
-                  <td className="border p-2">
-                     <input type="number" min="0" step="any" className="w-24 p-1 border rounded" value={species.driedPrice} onChange={(e) => handleNumericInputChange(species.id, 'driedPrice', e)} />
+                  {/* Processed */}
+                  <td className="border p-1.5 align-middle">
+                     <input type="number" min="0" step="any" className="w-20 p-1 border rounded" value={species.processedVolume} onChange={(e) => handleNumericInputChange(species.id, 'processedVolume', e)} />
                   </td>
-                  <td className="border p-2">
-                     <input type="number" min="0" step="any" className="w-24 p-1 border rounded" value={species.consumedVolume} onChange={(e) => handleNumericInputChange(species.id, 'consumedVolume', e)} />
+                   {/* Total Harvest (Calculated) */}
+                  <td className="border p-1.5 text-right bg-gray-100 align-middle font-medium">
+                      {formatNumber(species.totalHarvestVolume, 1)}
                   </td>
-                   <td className="border p-2">
-                     <input type="number" min="0" step="any" className="w-24 p-1 border rounded" value={species.processedVolume} onChange={(e) => handleNumericInputChange(species.id, 'processedVolume', e)} />
-                  </td>
-                  {/* Actions Cell */}
-                  <td className="border p-2 text-center">
+                  {/* Actions */}
+                  <td className="border p-1.5 text-center align-middle">
                     <button type="button" onClick={() => removeSpecies(species.id)} className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled={speciesData.length === 1} aria-label={`Remove ${species.name || 'species'}`}>
                       🗑️
                     </button>
@@ -457,10 +455,10 @@ const SeaweedFarmingCalculator: React.FC = () => {
             </tbody>
             <tfoot>
               <tr>
-                 {/* Adjust colspan */}
-                <td colSpan={10} className="border p-2">
-                  <button type="button" onClick={addSpecies} className="flex items-center text-green-600 hover:text-green-800 font-medium">
-                    <span className="mr-1 text-xl">➕</span> Add Species
+                 {/* UPDATE colspan (Now 9 columns) */}
+                <td colSpan={9} className="border p-2"> {/* Adjusted colspan */}
+                  <button type="button" onClick={addSpecies} className="flex items-center text-green-600 hover:text-green-800 font-medium text-sm"> {/* Slightly smaller text */}
+                    <span className="mr-1 text-lg">➕</span> Add Species
                   </button>
                 </td>
               </tr>
@@ -469,136 +467,113 @@ const SeaweedFarmingCalculator: React.FC = () => {
         </div>
       </Section>
 
-      {/* --- Frequency Editor Modal --- */}
-      {/* --- NEW: Added onClick handler to the backdrop --- */}
-      {isModalOpen && editingSpeciesId !== null && (
-        <div
-          className="fixed inset-0 bg-black/30 flex justify-center items-center p-4 z-50" // Slightly darker backdrop, added blur
-          onClick={(e) => {
-            // Close if the click is directly on the backdrop, not the content
-            if (e.target === e.currentTarget) {
-              closeFrequencyModal();
-            }
-          }}
-          role="dialog" // Add role for accessibility
-          aria-modal="true" // Indicate it's a modal dialog
-          aria-labelledby="frequency-modal-title" // Reference the title for screen readers
-        >
-          {/* --- Modal Content --- */}
-          {/* Stop propagation to prevent backdrop click when clicking inside */}
-          <div
-            className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-            >
-            <h3
-              id="frequency-modal-title" // ID for aria-labelledby
-              className="text-lg font-medium mb-4 text-gray-800"
-              >
-              Edit Sales Frequency for {speciesData.find(s => s.id === editingSpeciesId)?.name || 'Species'}
-            </h3>
-
-            <div className="space-y-4">
-               {/* Months Marked */}
-               <div>
-                 <LabelWithTooltip tooltip="Over how many months *in total per year* do sales typically occur?">
-                    Active Months per Year (1-12)
-                  </LabelWithTooltip>
-                  <input
-                    type="number" min="1" max="12" step="1"
-                    value={modalFrequency.monthsMarked}
-                    onChange={(e) => handleModalFrequencyChange('monthsMarked', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded bg-white"
-                  />
-               </div>
-
-              {/* Frequency Type */}
-              <div>
-                 <LabelWithTooltip tooltip="Select how sales frequency is measured *during* the active months.">
-                   Frequency Type
-                 </LabelWithTooltip>
-                <select
-                  value={modalFrequency.frequencyType}
-                  onChange={(e) => handleModalFrequencyChange('frequencyType', e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded bg-white text-gray-700"
-                >
-                   <option value="perYear">Times per Year (Total)</option>
-                   <option value="perMonth">Times per Month</option>
-                   <option value="perWeek">Times per Week</option>
-                   <option value="everyXMonths">Every X Months</option>
-                   <option value="everyXWeeks">Every X Weeks</option>
-                   <option value="once">Once (Total)</option>
-                 </select>
-              </div>
-
-              {/* Conditional Inputs */}
-               {(modalFrequency.frequencyType === 'perMonth' || modalFrequency.frequencyType === 'perWeek' || modalFrequency.frequencyType === 'perYear') && (
-                <div>
-                   <LabelWithTooltip tooltip={`How many times per ${modalFrequency.frequencyType === 'perWeek' ? 'week' : (modalFrequency.frequencyType === 'perMonth' ? 'month' : 'year')}?`}>
-                     Times
-                   </LabelWithTooltip>
-                   <input
-                    type="number" min="1" step="1"
-                    value={modalFrequency.frequencyValue}
-                    onChange={(e) => handleModalFrequencyChange('frequencyValue', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded bg-white"
-                   />
-                </div>
-              )}
-
-               {(modalFrequency.frequencyType === 'everyXMonths' || modalFrequency.frequencyType === 'everyXWeeks') && (
-                 <div>
-                   <LabelWithTooltip tooltip={`Sales occur every how many ${modalFrequency.frequencyType === 'everyXWeeks' ? 'weeks' : 'months'} (during active months)?`}>
-                     Interval (X)
-                   </LabelWithTooltip>
-                   <input
-                     type="number" min="1" step="1"
-                     value={modalFrequency.everyXValue}
-                     onChange={(e) => handleModalFrequencyChange('everyXValue', e.target.value)}
-                     className="w-full p-2 border border-gray-300 rounded bg-white"
-                   />
-                 </div>
-               )}
-
-               {/* Display Calculated Annual Sales */}
-                <div className="mt-4 p-2 bg-gray-100 rounded border text-sm">
-                    Calculated Annual Sales: <span className='font-semibold'>{formatNumber(calculateAnnualSales(modalFrequency), 1)}</span> times/year
-                    <p className='text-xs text-gray-500'>{getFrequencyDescription(modalFrequency)}</p>
-                </div>
-
-            </div>
-
-            {/* Modal Actions */}
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={closeFrequencyModal}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveFrequencyChanges}
-                className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700"
-              >
-                Save Frequency
-              </button>
-            </div>
-          </div> {/* End Modal Content */}
-        </div> // End Modal Backdrop
+      {/* --- Frequency Editor Modal (remains the same) --- */}
+      {isFrequencyModalOpen && editingFrequencySpeciesId !== null && (
+         <div className="fixed inset-0 bg-black/30 flex justify-center items-center p-4 z-50" onClick={closeFrequencyModal}>
+             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                  <h3 id="frequency-modal-title" className="text-lg font-medium mb-4 text-gray-800">
+                      Edit Sales Frequency for {speciesData.find(s => s.id === editingFrequencySpeciesId)?.name || 'Species'}
+                  </h3>
+                  <div className="space-y-4">
+                     {/* Months Marked */}
+                     <div>
+                        <LabelWithTooltip tooltip="Over how many months *in total per year* do sales typically occur?">Active Months per Year (1-12)</LabelWithTooltip>
+                        <input type="number" min="1" max="12" step="1" value={modalFrequency.monthsMarked} onChange={(e) => handleModalFrequencyChange('monthsMarked', e.target.value)} className="w-full p-2 border border-gray-300 rounded bg-white"/>
+                     </div>
+                    {/* Frequency Type */}
+                    <div>
+                        <LabelWithTooltip tooltip="Select how sales frequency is measured *during* the active months.">Frequency Type</LabelWithTooltip>
+                        <select value={modalFrequency.frequencyType} onChange={(e) => handleModalFrequencyChange('frequencyType', e.target.value)} className="w-full p-2 border border-gray-300 rounded bg-white text-gray-700">
+                            <option value="perYear">Times per Year (Total)</option>
+                            <option value="perMonth">Times per Month</option>
+                            <option value="perWeek">Times per Week</option>
+                            <option value="everyXMonths">Every X Months</option>
+                            <option value="everyXWeeks">Every X Weeks</option>
+                            <option value="once">Once (Total)</option>
+                        </select>
+                    </div>
+                    {/* Conditional Inputs */}
+                    {(modalFrequency.frequencyType === 'perMonth' || modalFrequency.frequencyType === 'perWeek' || modalFrequency.frequencyType === 'perYear') && (
+                        <div>
+                            <LabelWithTooltip tooltip={`How many times per ${modalFrequency.frequencyType === 'perWeek' ? 'week' : (modalFrequency.frequencyType === 'perMonth' ? 'month' : 'year')}?`}>Times</LabelWithTooltip>
+                            <input type="number" min="1" step="1" value={modalFrequency.frequencyValue} onChange={(e) => handleModalFrequencyChange('frequencyValue', e.target.value)} className="w-full p-2 border border-gray-300 rounded bg-white"/>
+                        </div>
+                    )}
+                    {(modalFrequency.frequencyType === 'everyXMonths' || modalFrequency.frequencyType === 'everyXWeeks') && (
+                        <div>
+                            <LabelWithTooltip tooltip={`Sales occur every how many ${modalFrequency.frequencyType === 'everyXWeeks' ? 'weeks' : 'months'} (during active months)?`}>Interval (X)</LabelWithTooltip>
+                            <input type="number" min="1" step="1" value={modalFrequency.everyXValue} onChange={(e) => handleModalFrequencyChange('everyXValue', e.target.value)} className="w-full p-2 border border-gray-300 rounded bg-white"/>
+                        </div>
+                    )}
+                    {/* Display Calculated Annual Sales */}
+                    <div className="mt-4 p-2 bg-gray-100 rounded border text-sm">
+                        Calculated Annual Sales: <span className='font-semibold'>{formatNumber(calculateAnnualSales(modalFrequency), 1)}</span> times/year
+                        <p className='text-xs text-gray-500'>{getFrequencyDescription(modalFrequency)}</p>
+                    </div>
+                  </div>
+                  {/* Modal Actions */}
+                  <div className="mt-6 flex justify-end space-x-3">
+                    <button type="button" onClick={closeFrequencyModal} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                    <button type="button" onClick={saveFrequencyChanges} className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700">Save Frequency</button>
+                  </div>
+             </div>
+         </div>
       )}
 
-      {/* --- Annual Income Calculation Section (PART 5) --- */}
-      {/* (No changes needed in the rest of the component) */}
+       {/* --- Dried Volume Helper Modal (remains the same) --- */}
+       {isDriedVolumeModalOpen && editingDriedVolumeSpeciesId !== null && (
+           <div className="fixed inset-0 bg-black/30 flex justify-center items-center p-4 z-50" onClick={closeDriedVolumeModal} role="dialog" aria-modal="true" aria-labelledby="dried-volume-modal-title">
+             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+               <h3 id="dried-volume-modal-title" className="text-lg font-medium mb-4 text-gray-800">Calculate Dried Volume</h3>
+                {(() => {
+                    const species = speciesData.find(s => s.id === editingDriedVolumeSpeciesId);
+                    const currentFreshForDrying = species?.freshWeightForDrying ?? 0;
+                    return (
+                       <div className="space-y-4">
+                         <div>
+                             <LabelWithTooltip tooltip="The fresh weight you entered that was set aside for drying.">Fresh Wt. for Drying (kg)</LabelWithTooltip>
+                             <input type="number" readOnly value={formatNumber(currentFreshForDrying, 1)} className="w-full p-2 border border-gray-300 rounded bg-gray-100"/>
+                         </div>
+                         <div>
+                           <LabelWithTooltip tooltip="Enter the ratio of FRESH weight to DRIED weight (e.g., '5' for 5:1, or '7:1').">Fresh : Dry Ratio</LabelWithTooltip>
+                           <input type="text" placeholder="e.g., 5 or 7:1" value={modalRatioInput} onChange={handleModalRatioInputChange} className="w-full p-2 border border-gray-300 rounded bg-white" autoFocus/>
+                         </div>
+                         <div className="mt-4 p-2 bg-indigo-50 rounded border border-indigo-200 text-sm">
+                             Calculated Dried Volume: <span className='font-semibold'>
+                                 {(() => {
+                                     const ratio = parseRatio(modalRatioInput);
+                                     if (isFinite(ratio) && ratio > 0 && currentFreshForDrying > 0) {
+                                         return `${formatNumber(currentFreshForDrying / ratio, 2)} kg`;
+                                     } else if (currentFreshForDrying <= 0) {
+                                         return 'Enter Fresh Wt. first';
+                                     } else {
+                                         return 'Invalid Ratio';
+                                     }
+                                 })()}
+                             </span>
+                         </div>
+                       </div>
+                    );
+                })()}
+               <div className="mt-6 flex justify-end space-x-3">
+                 <button type="button" onClick={closeDriedVolumeModal} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                 <button type="button" onClick={saveDriedVolumeFromRatio} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Update Dried Volume</button>
+               </div>
+             </div>
+           </div>
+       )}
+
+
+      {/* --- Annual Income Calculation Section (remains the same structure) --- */}
        <Section title="Annual Income Calculation">
-         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
-           <h3 className="font-semibold mb-2">Calculation Logic:</h3>
-           <p>Vol per Sale (Fresh/Dried) × Price (Fresh/Dried) = Revenue per Sale (Fresh/Dried)</p>
-           <p>Rev per Sale (Fresh + Dried) = Total Revenue per Sale</p>
-           <p>Total Rev per Sale × (Calculated Annual Sales based on Frequency Settings) = Annual Income</p>
-         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse border text-sm">
+          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
+             <h3 className="font-semibold mb-2">Calculation Logic:</h3>
+             <p>Total Harvest (per cycle) = Sold Fresh + Fresh Wt. for Drying + Consumed + Processed</p>
+             <p>Revenue per Sale = (Fresh Vol Sold × Fresh Price) + (Dried Vol Sold × Dried Price)</p>
+             <p>Annual Income = Revenue per Sale × Calculated Annual Sales (from Frequency)</p>
+           </div>
+         <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse border text-sm">
              <thead className="bg-teal-50">
               <tr>
                 <th className="border p-2 align-bottom" rowSpan={2}>Species</th>
@@ -608,18 +583,10 @@ const SeaweedFarmingCalculator: React.FC = () => {
               </tr>
               <tr>
                 <th className="border p-2">Avg Price (₱/kg)</th>
-                <th className="border p-2">
-                   <LabelWithTooltip tooltip="Total volume of DRIED seaweed sold per year, calculated as Volume per Sale (kg) × Calculated Annual Sales">
-                     Total Volume (kg/yr)
-                   </LabelWithTooltip>
-                 </th>
+                <th className="border p-2"><LabelWithTooltip tooltip="Total DRIED sold/yr = Dried Vol per Sale × Sales/yr">Total Volume (kg/yr)</LabelWithTooltip></th>
                 <th className="border p-2">Total Revenue (₱/yr)</th>
                 <th className="border p-2">Avg Price (₱/kg)</th>
-                <th className="border p-2">
-                   <LabelWithTooltip tooltip="Total volume of FRESH seaweed sold per year, calculated as Volume per Sale (kg) × Calculated Annual Sales">
-                     Total Volume (kg/yr)
-                   </LabelWithTooltip>
-                 </th>
+                <th className="border p-2"><LabelWithTooltip tooltip="Total FRESH sold/yr = Fresh Vol per Sale × Sales/yr">Total Volume (kg/yr)</LabelWithTooltip></th>
                 <th className="border p-2">Total Revenue (₱/yr)</th>
               </tr>
             </thead>
@@ -629,8 +596,8 @@ const SeaweedFarmingCalculator: React.FC = () => {
                 const freshVolumePerYear = species.freshVolume * species.salesPerYear;
                 const driedRevenuePerYear = species.driedRevenuePerCycle * species.salesPerYear;
                 const freshRevenuePerYear = species.freshRevenuePerCycle * species.salesPerYear;
-                const driedVolText = `${formatNumber(species.driedVolume, 1)}kg × ${formatNumber(species.salesPerYear, 1)} sales = ${formatNumber(driedVolumePerYear, 1)} kg`;
-                const freshVolText = `${formatNumber(species.freshVolume, 1)}kg × ${formatNumber(species.salesPerYear, 1)} sales = ${formatNumber(freshVolumePerYear, 1)} kg`;
+                const driedVolText = `${formatNumber(driedVolumePerYear, 1)} kg`;
+                const freshVolText = `${formatNumber(freshVolumePerYear, 1)} kg`;
 
                 return (
                   <tr key={species.id}>
@@ -655,14 +622,14 @@ const SeaweedFarmingCalculator: React.FC = () => {
                 <td className="border p-2 text-right font-bold text-lg">₱{formatNumber(totalAnnualIncome)}</td>
               </tr>
             </tfoot>
-          </table>
-        </div>
-      </Section>
+           </table>
+         </div>
+       </Section>
 
-      {/* --- Marketing Section (PART 6 - Single Sale Cycle) --- */}
-       <Section title="PART 6: Seaweed Farming Marketing (Single Sale Cycle)">
-         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse border text-sm">
+       {/* --- Marketing Section (PART 6 - Single Sale Cycle) (remains the same structure) --- */}
+        <Section title="PART 6: Seaweed Farming Marketing (Single Sale Cycle)">
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse border text-sm">
              <thead className="bg-teal-50">
               <tr>
                 <th className="border p-2 align-bottom" rowSpan={2}>Species</th>
@@ -680,19 +647,23 @@ const SeaweedFarmingCalculator: React.FC = () => {
                 <React.Fragment key={species.id}>
                   {/* Dried Row */}
                   <tr className={species.driedVolume > 0 ? "bg-gray-50" : "bg-gray-50 opacity-50"}>
-                    <td className="border p-2 align-top" rowSpan={2}>{species.name || `Species ${species.id}`}</td>
+                    {/* Adjust rowSpan based on whether Fresh row will be shown */}
+                    <td className="border p-2 align-top" rowSpan={species.freshVolume > 0 ? 2 : 1}>{species.name || `Species ${species.id}`}</td>
                     <td className="border p-2 font-medium text-center align-middle">D</td>
                     <td className="border p-2 text-right align-middle">{formatNumber(species.driedVolume, 1)} kg</td>
                     <td className="border p-2 text-right align-middle">₱{formatNumber(species.driedPrice)}</td>
                     <td className="border p-2 text-right font-semibold align-middle">₱{formatNumber(species.driedRevenuePerCycle)}</td>
                   </tr>
-                  {/* Fresh Row */}
-                   <tr className={species.freshVolume > 0 ? "" : "opacity-50"}>
-                    <td className="border p-2 font-medium text-center align-middle">F</td>
-                    <td className="border p-2 text-right align-middle">{formatNumber(species.freshVolume, 1)} kg</td>
-                    <td className="border p-2 text-right align-middle">₱{formatNumber(species.freshPrice)}</td>
-                    <td className="border p-2 text-right font-semibold align-middle">₱{formatNumber(species.freshRevenuePerCycle)}</td>
-                  </tr>
+                  {/* Fresh Row (Only show if fresh volume > 0) */}
+                   {species.freshVolume > 0 && (
+                     <tr className={species.freshVolume > 0 ? "" : "opacity-50"}>
+                        {/* No Species Name needed if using rowSpan above */}
+                        <td className="border p-2 font-medium text-center align-middle">F</td>
+                        <td className="border p-2 text-right align-middle">{formatNumber(species.freshVolume, 1)} kg</td>
+                        <td className="border p-2 text-right align-middle">₱{formatNumber(species.freshPrice)}</td>
+                        <td className="border p-2 text-right font-semibold align-middle">₱{formatNumber(species.freshRevenuePerCycle)}</td>
+                     </tr>
+                   )}
                 </React.Fragment>
               ))}
             </tbody>
@@ -704,15 +675,15 @@ const SeaweedFarmingCalculator: React.FC = () => {
                 </td>
               </tr>
             </tfoot>
-          </table>
-        </div>
-      </Section>
+           </table>
+         </div>
+       </Section>
 
-      {/* --- Summary Card --- */}
+      {/* --- Summary Card (remains the same structure) --- */}
       <div className="mt-8 p-4 bg-teal-50 border border-teal-200 rounded-md shadow-sm">
         <h3 className="font-bold mb-4 text-teal-800 border-b border-teal-300 pb-2">Calculation Summary:</h3>
          <div className="mt-4 p-4 bg-white rounded-lg border border-teal-200">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="text-center p-3 bg-yellow-100 rounded shadow-sm border border-yellow-300">
                 <div className="text-sm text-yellow-700 mb-1">Total Income per Sale Cycle</div>
                 <div className="font-bold text-xl text-yellow-900">
@@ -725,18 +696,20 @@ const SeaweedFarmingCalculator: React.FC = () => {
                 <div className="font-bold text-xl text-green-900">
                     ₱{formatNumber(totalAnnualIncome)}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">(Income per Cycle × Calculated Sales per Year, summed for all species)</div>
+                <div className="text-xs text-gray-500 mt-1">(Income per Cycle × Sales per Year, summed)</div>
                 </div>
             </div>
          </div>
         <ul className="space-y-1 text-sm mt-4 list-disc pl-5 text-gray-700">
-          <li><span className="font-medium">Income per Sale Cycle</span> = (Fresh Vol × Fresh Price) + (Dried Vol × Dried Price)</li>
-          <li><span className="font-medium">Annual Income</span> = Income per Sale Cycle × (Calculated Annual Sales based on Frequency Settings)</li>
-          <li>Entering Fresh Vol & Ratio calculates Dried Vol.</li>
-          <li>Entering Dried Vol calculates the effective Ratio (based on Fresh Vol).</li>
-          <li>Use the <span className='font-semibold'>'Edit Freq.'</span> button in Part 5 to set how often sales occur per year.</li>
+           <li><span className="font-medium">Total Harvest (per cycle)</span> is calculated based on inputs in Part 5.</li>
+           <li><span className="font-medium">Income per Sale Cycle</span> = (Fresh Vol Sold × Fresh Price) + (Dried Vol Sold × Dried Price).</li>
+          <li><span className="font-medium">Annual Income</span> = Income per Sale Cycle × (Calculated Annual Sales based on Frequency Settings).</li>
+          <li>Enter <span className='font-semibold'>Fresh Wt. for Drying</span> (initial fresh weight).</li>
+           <li>Enter <span className='font-semibold'>Dried Vol Sold</span> directly, or use the <span className='font-semibold'>'Calc'</span> button to determine it from the Fresh Wt. for Drying and a Fresh:Dry Ratio.</li>
+          <li>Use the <span className='font-semibold'>'Edit Freq.'</span> button to set how often sales occur per year.</li>
         </ul>
       </div>
+
     </div>
   );
 }
