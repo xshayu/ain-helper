@@ -261,11 +261,11 @@ const SeaweedSchedule = () => {
                 case 'perMonth':
                   return <span>{frequencyValue} times × {monthsMarked} months × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
                 case 'perWeek':
-                  return <span>{frequencyValue} times × {monthsMarked} months × {CONFIG.NUMBER_OF_WEEKS_PER_MONTH} weeks/month × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
+                  return <span>{frequencyValue} times × {monthsMarked} months × {formatNumber(CONFIG.NUMBER_OF_WEEKS_PER_MONTH)} weeks/month × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
                 case 'everyXMonths':
                   return <span>{monthsMarked} months × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
                 case 'everyXWeeks':
-                  return <span>({monthsMarked} months × {CONFIG.NUMBER_OF_WEEKS_PER_MONTH} weeks/month) ÷ {everyXValue} × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
+                  return <span>({monthsMarked} months × {formatNumber(CONFIG.NUMBER_OF_WEEKS_PER_MONTH)} weeks/month) ÷ {everyXValue} × {hoursPerActivity} hours per activity = {totalHours} hours</span>;
                 default:
                   return null;
               }

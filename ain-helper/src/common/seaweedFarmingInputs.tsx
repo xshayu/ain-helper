@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import LabelWithTooltip from './ui/labelWithTooltip';
+import { formatNumber } from '../utils';
 
 const formatCurrency = (num: number) =>
-  '₱' + (Math.round(num * 100) / 100).toLocaleString('en-PH');
+  '₱' + formatNumber(num);
 
 type TimeUnit = 'year' | 'month' | 'week' | 'everyXMos' | 'everyXWks';
 

@@ -1,49 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import LabelWithTooltip from './ui/labelWithTooltip';
 import Section from './ui/sectionComponent';
-
-// Helper to format numbers for display
-const formatNumber = (num: number | null | undefined, decimals = 2): string => {
-  if (isNaN(Number(num)) || num === null || num === undefined) return '0';
-  // Handle potential floating point inaccuracies for rounding
-  const factor = Math.pow(10, decimals);
-  // Use Number() to satisfy TypeScript strict checks
-  const rounded = Math.round((Number(num) + Number.EPSILON) * factor) / factor;
-  return rounded.toLocaleString('en-US', {
-    minimumFractionDigits: 0, // Don't show .00
-    maximumFractionDigits: decimals,
-  });
-};
-
-// Type definition for Dropdown options
-// interface DropdownOption {
-//   id: number;
-//   label: string;
-// }
-
-// Options for dropdowns
-// const buyerTypes: DropdownOption[] = [
-//   { id: 1, label: "Consolidator/wholesaler" }, { id: 2, label: "Retailer" },
-//   { id: 3, label: "Wholesaler" }, { id: 4, label: "Restaurant" },
-//   { id: 5, label: "Hotel" }, { id: 6, label: "Broker" },
-//   { id: 7, label: "Others (specify)" }
-// ];
-// const buyerLocations: DropdownOption[] = [
-//   { id: 1, label: "San Dionisio" }, { id: 2, label: "Estancia" },
-//   { id: 3, label: "Concepcion" }, { id: 4, label: "Others (specify)" }
-// ];
-// const paymentModes: DropdownOption[] = [
-//   { id: 1, label: "Cash upon pick up" }, { id: 2, label: "Cash on delivery" },
-//   { id: 3, label: "Credit - pick up" }, { id: 4, label: "Credit - delivery" },
-//   { id: 5, label: "Bank transfer" }, { id: 6, label: "Gcash" },
-//   { id: 7, label: "Others (specify)" }
-// ];
+import { formatNumber } from '../utils';
 
 // Interface defining the structure for each species' data
 interface SpeciesData {
   id: number; // Unique identifier for React keys
   name: string;
-  // marketSchedule: string;
   timesPerSixMonths: number;
   freshVolume: number;
   freshPrice: number;
@@ -53,13 +16,6 @@ interface SpeciesData {
   driedPrice: number;
   consumedVolume: number;
   processedVolume: number;
-  // Marketing data
-  // buyerType: number;
-  // buyerLocation: number;
-  // paymentMode: number;
-  // buyerOther: string;
-  // locationOther: string;
-  // paymentOther: string;
 }
 
 // Interface for the calculated data derived from SpeciesData
@@ -74,7 +30,6 @@ interface CalculatedSpeciesData extends SpeciesData {
 // Initial state for a species row
 const initialSpeciesData: Omit<SpeciesData, 'id'> = { // Omit ID as it's generated
   name: '',
-  // marketSchedule: '',
   timesPerSixMonths: 2,
   freshVolume: 0,
   freshPrice: 0,
@@ -84,13 +39,6 @@ const initialSpeciesData: Omit<SpeciesData, 'id'> = { // Omit ID as it's generat
   driedPrice: 0,
   consumedVolume: 0,
   processedVolume: 0,
-  // Marketing data defaults
-  // buyerType: 1,
-  // buyerLocation: 1,
-  // paymentMode: 1,
-  // buyerOther: '',
-  // locationOther: '',
-  // paymentOther: ''
 };
 
 // Helper to parse ratio input (string like "5" or "7:1") into a number
@@ -267,10 +215,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
    const handleTextInputChange = (id: number, field: keyof SpeciesData, e: React.ChangeEvent<HTMLInputElement>) => {
        updateSpeciesField(id, field, e.target.value);
    };
-   // Generic handler for select dropdowns
-  //  const handleSelectChange = (id: number, field: keyof SpeciesData, e: React.ChangeEvent<HTMLSelectElement>) => {
-  //       updateSpeciesField(id, field, parseInt(e.target.value, 10)); // Pass value as number
-  //   };
 
 
   return (
@@ -284,11 +228,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
             <thead className="bg-teal-50">
               <tr>
                 <th className="border p-2"><LabelWithTooltip tooltip="Name of the seaweed species">Species</LabelWithTooltip></th>
-{/*                 <th className="border p-2">
-                  <LabelWithTooltip tooltip="What is the usual harvest/market schedule? (e.g., Monthly, Every 45 days)">
-                    Market Schedule
-                  </LabelWithTooltip>
-                </th> */}
                 <th className="border p-2">
                   <LabelWithTooltip tooltip="Number of times sold within a six-month period. Determines annual calculation multiplier.">
                     Times Sold per 6 Months
@@ -344,15 +283,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
                       onChange={(e) => handleTextInputChange(species.id, 'name', e)}
                     />
                   </td>
-{/*                   <td className="border p-2">
-                    <input
-                      type="text"
-                      className="w-full p-1 border rounded min-w-[100px]"
-                      placeholder="e.g., Monthly"
-                      value={species.marketSchedule}
-                      onChange={(e) => handleTextInputChange(species.id, 'marketSchedule', e)}
-                    />
-                  </td> */}
                   <td className="border p-2">
                     <input
                       type="number"
