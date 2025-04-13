@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react'; // Import useEffect
 import LabelWithTooltip from './ui/labelWithTooltip';
 import Section from './ui/sectionComponent';
 import { formatNumber, CONFIG } from '../utils'; // Assuming CONFIG is exported
@@ -56,7 +56,6 @@ const initialSpeciesData: Omit<SpeciesData, 'id'> = {
 
 // parseRatio helper function (keep as is)
 const parseRatio = (input: string | number): number => {
-  // ... (keep existing implementation)
   const trimmed = String(input).trim();
   if (trimmed.includes(':')) {
     const parts = trimmed.split(':');
@@ -96,17 +95,22 @@ const calculateAnnualSales = (species: Pick<SpeciesData, 'frequencyType' | 'freq
       return val * validMonths;
     case 'perWeek':
       // 'frequencyValue' times per week, only during 'validMonths'
-      return val * validMonths * CONFIG.NUMBER_OF_WEEKS_PER_MONTH;
+      // Use a more standard 4.33 weeks/month if CONFIG isn't defined or you prefer
+      const weeksPerMonth = CONFIG?.NUMBER_OF_WEEKS_PER_MONTH ?? (52/12);
+      return val * validMonths * weeksPerMonth;
     case 'everyXMonths':
       // How many full 'everyXValue' month intervals fit within 'validMonths'?
       // This calculates occurrences *within* the active months.
       if (xVal <= 0) return 0; // Avoid division by zero
-      return Math.floor(validMonths / xVal);
+      // Ensure at least one sale if monthsMarked >= xVal
+      return validMonths >= xVal ? Math.floor(validMonths / xVal) : 0;
     case 'everyXWeeks':
       // How many full 'everyXValue' week intervals fit within the weeks of 'validMonths'?
       if (xVal <= 0) return 0; // Avoid division by zero
-      const totalWeeksInMarkedMonths = validMonths * CONFIG.NUMBER_OF_WEEKS_PER_MONTH;
-      return Math.floor(totalWeeksInMarkedMonths / xVal);
+      const weeksPerMonthForCalc = CONFIG?.NUMBER_OF_WEEKS_PER_MONTH ?? (52/12);
+      const totalWeeksInMarkedMonths = validMonths * weeksPerMonthForCalc;
+       // Ensure at least one sale if totalWeeks >= xVal
+      return totalWeeksInMarkedMonths >= xVal ? Math.floor(totalWeeksInMarkedMonths / xVal) : 0;
     default:
       return 0;
   }
@@ -118,14 +122,15 @@ const getFrequencyDescription = (species: Pick<SpeciesData, 'frequencyType' | 'f
     const val = frequencyValue || 1;
     const xVal = everyXValue || 1;
     const months = monthsMarked || 12;
+    const monthText = `${months} ${months === 1 ? 'mo' : 'mos'}`; // Handle plural 'mo'
 
     switch (frequencyType) {
-        case 'once': return `Once (over ${months} mo)`;
+        case 'once': return `Once (over ${monthText})`;
         case 'perYear': return `${val} time(s) per year`;
-        case 'perMonth': return `${val} time(s)/month for ${months} mo`;
-        case 'perWeek': return `${val} time(s)/week for ${months} mo`;
-        case 'everyXMonths': return `Every ${xVal} months for ${months} mo`;
-        case 'everyXWeeks': return `Every ${xVal} weeks for ${months} mo`;
+        case 'perMonth': return `${val} time(s)/month for ${monthText}`;
+        case 'perWeek': return `${val} time(s)/week for ${monthText}`;
+        case 'everyXMonths': return `Every ${xVal} months for ${monthText}`;
+        case 'everyXWeeks': return `Every ${xVal} weeks for ${monthText}`;
         default: return 'N/A';
     }
 };
@@ -166,7 +171,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
   };
 
   // --- Update Handler ---
-  // Now also handles frequency fields
   const updateSpeciesField = useCallback((idToUpdate: number, field: keyof SpeciesData, value: string | number) => {
     setSpeciesData(currentData => {
       return currentData.map(species => {
@@ -176,23 +180,14 @@ const SeaweedFarmingCalculator: React.FC = () => {
 
         const updatedSpecies: SpeciesData = { ...species };
 
-        // --- Update the specific field ---
-        // Handle frequency fields separately for type safety if needed,
-        // otherwise rely on parsing within the switch
         switch (field) {
-          // --- Cases for Frequency Fields ---
           case 'frequencyType':
-            updatedSpecies.frequencyType = value as FrequencyType; // Assume value is correct type
-            // Reset related fields when type changes? Optional, but can prevent confusion.
-            // e.g., if switching from 'perMonth' to 'everyXMonths', reset frequencyValue?
-            // updatedSpecies.frequencyValue = 1;
-            // updatedSpecies.everyXValue = 1;
+            updatedSpecies.frequencyType = value as FrequencyType;
             break;
           case 'frequencyValue':
           case 'everyXValue':
           case 'monthsMarked':
             updatedSpecies[field] = parseInt(String(value), 10) || 0;
-            // Add validation/clamping if needed (e.g., monthsMarked 1-12)
             if (field === 'monthsMarked') {
                 updatedSpecies.monthsMarked = Math.max(1, Math.min(12, updatedSpecies.monthsMarked));
             }
@@ -201,11 +196,10 @@ const SeaweedFarmingCalculator: React.FC = () => {
             }
             break;
 
-          // --- Existing Cases (mostly unchanged) ---
           case 'freshVolume':
             const numValue = parseFloat(String(value)) || 0;
             updatedSpecies.freshVolume = numValue;
-            updatedSpecies.driedVolume = (updatedSpecies.freshToDryRatio > 0)
+            updatedSpecies.driedVolume = (updatedSpecies.freshToDryRatio > 0 && updatedSpecies.freshToDryRatio !== Infinity)
               ? numValue / updatedSpecies.freshToDryRatio
               : 0;
             break;
@@ -214,7 +208,7 @@ const SeaweedFarmingCalculator: React.FC = () => {
             updatedSpecies.ratioInput = String(value);
             const newNumericRatio = parseRatio(String(value));
             updatedSpecies.freshToDryRatio = newNumericRatio;
-            updatedSpecies.driedVolume = (newNumericRatio > 0)
+            updatedSpecies.driedVolume = (newNumericRatio > 0 && newNumericRatio !== Infinity)
               ? updatedSpecies.freshVolume / newNumericRatio
               : 0;
             break;
@@ -225,15 +219,18 @@ const SeaweedFarmingCalculator: React.FC = () => {
             if (driedNumValue > 0 && updatedSpecies.freshVolume > 0) {
               const calculatedRatio = updatedSpecies.freshVolume / driedNumValue;
               updatedSpecies.freshToDryRatio = calculatedRatio;
-              // updatedSpecies.ratioInput = formatNumber(calculatedRatio, 1); // Optional
-            } else {
-               if (updatedSpecies.freshVolume <= 0 && driedNumValue > 0) {
-                  updatedSpecies.freshToDryRatio = Infinity;
-               }
-               // Maybe reset ratioInput if dried is set to 0?
-               // else if (driedNumValue <= 0) {
-               //    updatedSpecies.ratioInput = updatedSpecies.freshToDryRatio.toString(); // Sync if possible
-               //}
+              // Update ratio input to reflect the change, formatted nicely
+              updatedSpecies.ratioInput = formatNumber(calculatedRatio, 1) + ':1'; // Or just the number
+            } else if (driedNumValue > 0 && updatedSpecies.freshVolume <= 0) {
+               // Cannot calculate ratio if fresh volume is 0
+               updatedSpecies.freshToDryRatio = Infinity; // Or keep previous? Or set to 1? Decide behavior.
+               // updatedSpecies.ratioInput = "∞"; // Indicate infinity or uncalculable
+            } else if (driedNumValue <= 0) {
+                // If dried volume is set to 0, ratio might become infinity or 0/0.
+                // Maybe revert to the ratio derived from ratioInput if available?
+                const ratioFromInput = parseRatio(updatedSpecies.ratioInput);
+                updatedSpecies.freshToDryRatio = ratioFromInput;
+                 // Or simply set driedVolume to 0 and leave ratio as is? Depends on desired UX.
             }
             break;
 
@@ -243,9 +240,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
           case 'processedVolume':
             updatedSpecies[field] = parseFloat(String(value)) || 0;
             break;
-
-          // Remove timesPerSixMonths case
-          // case 'timesPerSixMonths': ...
 
           default: // Handles 'name'
             (updatedSpecies[field] as any) = String(value);
@@ -262,7 +256,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
     const speciesToEdit = speciesData.find(s => s.id === id);
     if (speciesToEdit) {
       setEditingSpeciesId(id);
-      // Set modal's internal state from the species being edited
       setModalFrequency({
         frequencyType: speciesToEdit.frequencyType,
         frequencyValue: speciesToEdit.frequencyValue,
@@ -273,20 +266,25 @@ const SeaweedFarmingCalculator: React.FC = () => {
     }
   };
 
-  const closeFrequencyModal = () => {
+  // --- NEW: Wrap closeFrequencyModal in useCallback ---
+  const closeFrequencyModal = useCallback(() => {
     setIsModalOpen(false);
     setEditingSpeciesId(null);
-    // Reset modal state if desired
-    // setModalFrequency({...});
-  };
+    // Optional: Reset modal form state if you don't want it to persist
+    // setModalFrequency({ frequencyType: 'perYear', frequencyValue: 2, everyXValue: 1, monthsMarked: 12 });
+  }, []); // No dependencies needed as it only uses state setters
 
   const handleModalFrequencyChange = (field: keyof typeof modalFrequency, value: string | number) => {
     setModalFrequency(prev => {
         const updated = { ...prev };
         if (field === 'frequencyType') {
             updated.frequencyType = value as FrequencyType;
-            // Optional: Reset other values when type changes
-            // updated.frequencyValue = 1;
+            // Optional: Reset other values when type changes for clarity
+            // if (value === 'perYear' || value === 'once') {
+            //     updated.frequencyValue = (value === 'perYear' ? 2 : 1);
+            // } else {
+            //     updated.frequencyValue = 1;
+            // }
             // updated.everyXValue = 1;
         } else {
             let numValue = parseInt(String(value), 10) || 0;
@@ -301,8 +299,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
 
   const saveFrequencyChanges = () => {
     if (editingSpeciesId !== null) {
-      // Update the main state using updateSpeciesField for each changed frequency field
-      // This ensures consistency with how other fields are updated
       updateSpeciesField(editingSpeciesId, 'frequencyType', modalFrequency.frequencyType);
       updateSpeciesField(editingSpeciesId, 'frequencyValue', modalFrequency.frequencyValue);
       updateSpeciesField(editingSpeciesId, 'everyXValue', modalFrequency.everyXValue);
@@ -313,19 +309,16 @@ const SeaweedFarmingCalculator: React.FC = () => {
 
 
   // --- Calculation Function ---
-  // Uses the new calculateAnnualSales helper
   const calculateTotals = (): { calculatedData: CalculatedSpeciesData[], totalAnnualIncome: number } => {
     let totalAnnualIncome = 0;
 
     const calculatedData: CalculatedSpeciesData[] = speciesData.map(species => {
-      // *** Use the new helper function ***
       const salesPerYear = calculateAnnualSales(species);
 
       const freshRevenuePerCycle = species.freshVolume * species.freshPrice;
       const driedRevenuePerCycle = species.driedVolume * species.driedPrice;
       const totalRevenuePerCycle = freshRevenuePerCycle + driedRevenuePerCycle;
 
-      // Annual revenue depends on the calculated salesPerYear
       const annualRevenue = totalRevenuePerCycle * salesPerYear;
 
       totalAnnualIncome += annualRevenue;
@@ -353,10 +346,29 @@ const SeaweedFarmingCalculator: React.FC = () => {
        updateSpeciesField(id, field, e.target.value);
    };
 
+   // --- NEW: useEffect for Escape key handling ---
+   useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeFrequencyModal();
+      }
+    };
+
+    if (isModalOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    // Cleanup function: remove listener when modal closes or component unmounts
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isModalOpen, closeFrequencyModal]); // Dependencies
+
 
   // --- Render JSX ---
   return (
     <div className="max-w-full mx-auto p-4 font-sans">
+      {/* ... (rest of the component preamble, table headers etc. remains the same) ... */}
       <h1 className="text-xl font-bold mb-6 text-center text-teal-800">Seaweed Farming Income Calculator</h1>
 
       {/* Form 4 Equivalent - Production Data */}
@@ -366,13 +378,11 @@ const SeaweedFarmingCalculator: React.FC = () => {
             <thead className="bg-teal-50">
               <tr>
                 <th className="border p-2"><LabelWithTooltip tooltip="Name of the seaweed species">Species</LabelWithTooltip></th>
-                {/* --- Updated Frequency Column Header --- */}
                 <th className="border p-2">
                   <LabelWithTooltip tooltip="Frequency of sales per year. Click 'Edit' to configure details (e.g., per month, per week, specific number of times).">
                     Sales Frequency (per Year)
                   </LabelWithTooltip>
                 </th>
-                {/* Other headers remain the same */}
                 <th className="border p-2"><LabelWithTooltip tooltip="Expected FRESH seaweed volume SOLD per sale event/cycle, kg">Fresh Vol Sold (kg)</LabelWithTooltip></th>
                 <th className="border p-2"><LabelWithTooltip tooltip="Selling price per kg FRESH wet seaweed">Fresh Price (₱/kg)</LabelWithTooltip></th>
                 <th className="border p-2"><LabelWithTooltip tooltip="Ratio of FRESH weight to DRIED weight. Enter as a number (e.g., 5) or ratio (e.g., 7:1). Changing this or Fresh Volume updates Dried Volume.">Fresh:Dry Ratio</LabelWithTooltip></th>
@@ -384,7 +394,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {/* Use calculatedData here to easily access salesPerYear for display */}
               {calculatedData.map((species) => (
                 <tr key={species.id}>
                   {/* Species Name */}
@@ -397,7 +406,7 @@ const SeaweedFarmingCalculator: React.FC = () => {
                       onChange={(e) => handleTextInputChange(species.id, 'name', e)}
                     />
                   </td>
-                  {/* --- Updated Frequency Cell --- */}
+                  {/* Frequency Cell */}
                   <td className="border p-2 text-center align-middle">
                     <div className='flex flex-col items-center gap-1'>
                       <span className="text-xs whitespace-nowrap">
@@ -415,7 +424,7 @@ const SeaweedFarmingCalculator: React.FC = () => {
                       </button>
                     </div>
                   </td>
-                  {/* Other cells (Fresh Vol, Price, Ratio, etc.) */}
+                  {/* Other cells */}
                   <td className="border p-2">
                     <input type="number" min="0" step="any" className="w-24 p-1 border rounded" value={species.freshVolume} onChange={(e) => handleNumericInputChange(species.id, 'freshVolume', e)} />
                   </td>
@@ -461,10 +470,30 @@ const SeaweedFarmingCalculator: React.FC = () => {
       </Section>
 
       {/* --- Frequency Editor Modal --- */}
+      {/* --- NEW: Added onClick handler to the backdrop --- */}
       {isModalOpen && editingSpeciesId !== null && (
-        <div className="fixed inset-0 bg-black/15 bg-opacity-50 flex justify-center items-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium mb-4 text-gray-800">
+        <div
+          className="fixed inset-0 bg-black/30 flex justify-center items-center p-4 z-50" // Slightly darker backdrop, added blur
+          onClick={(e) => {
+            // Close if the click is directly on the backdrop, not the content
+            if (e.target === e.currentTarget) {
+              closeFrequencyModal();
+            }
+          }}
+          role="dialog" // Add role for accessibility
+          aria-modal="true" // Indicate it's a modal dialog
+          aria-labelledby="frequency-modal-title" // Reference the title for screen readers
+        >
+          {/* --- Modal Content --- */}
+          {/* Stop propagation to prevent backdrop click when clicking inside */}
+          <div
+            className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+            >
+            <h3
+              id="frequency-modal-title" // ID for aria-labelledby
+              className="text-lg font-medium mb-4 text-gray-800"
+              >
               Edit Sales Frequency for {speciesData.find(s => s.id === editingSpeciesId)?.name || 'Species'}
             </h3>
 
@@ -555,18 +584,17 @@ const SeaweedFarmingCalculator: React.FC = () => {
                 Save Frequency
               </button>
             </div>
-          </div>
-        </div>
+          </div> {/* End Modal Content */}
+        </div> // End Modal Backdrop
       )}
 
       {/* --- Annual Income Calculation Section (PART 5) --- */}
-      {/* Minor changes needed here to reflect how salesPerYear is calculated */}
-      <Section title="Annual Income Calculation">
+      {/* (No changes needed in the rest of the component) */}
+       <Section title="Annual Income Calculation">
          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
            <h3 className="font-semibold mb-2">Calculation Logic:</h3>
            <p>Vol per Sale (Fresh/Dried) × Price (Fresh/Dried) = Revenue per Sale (Fresh/Dried)</p>
            <p>Rev per Sale (Fresh + Dried) = Total Revenue per Sale</p>
-           {/* Updated explanation */}
            <p>Total Rev per Sale × (Calculated Annual Sales based on Frequency Settings) = Annual Income</p>
          </div>
         <div className="overflow-x-auto">
@@ -580,7 +608,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
               </tr>
               <tr>
                 <th className="border p-2">Avg Price (₱/kg)</th>
-                 {/* Updated tooltip */}
                 <th className="border p-2">
                    <LabelWithTooltip tooltip="Total volume of DRIED seaweed sold per year, calculated as Volume per Sale (kg) × Calculated Annual Sales">
                      Total Volume (kg/yr)
@@ -588,7 +615,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
                  </th>
                 <th className="border p-2">Total Revenue (₱/yr)</th>
                 <th className="border p-2">Avg Price (₱/kg)</th>
-                 {/* Updated tooltip */}
                 <th className="border p-2">
                    <LabelWithTooltip tooltip="Total volume of FRESH seaweed sold per year, calculated as Volume per Sale (kg) × Calculated Annual Sales">
                      Total Volume (kg/yr)
@@ -599,13 +625,10 @@ const SeaweedFarmingCalculator: React.FC = () => {
             </thead>
             <tbody>
               {calculatedData.map((species) => {
-                 // Use the already calculated salesPerYear from calculatedData
                 const driedVolumePerYear = species.driedVolume * species.salesPerYear;
                 const freshVolumePerYear = species.freshVolume * species.salesPerYear;
                 const driedRevenuePerYear = species.driedRevenuePerCycle * species.salesPerYear;
                 const freshRevenuePerYear = species.freshRevenuePerCycle * species.salesPerYear;
-
-                 // Show calculation breakdown in volume cells
                 const driedVolText = `${formatNumber(species.driedVolume, 1)}kg × ${formatNumber(species.salesPerYear, 1)} sales = ${formatNumber(driedVolumePerYear, 1)} kg`;
                 const freshVolText = `${formatNumber(species.freshVolume, 1)}kg × ${formatNumber(species.salesPerYear, 1)} sales = ${formatNumber(freshVolumePerYear, 1)} kg`;
 
@@ -636,14 +659,10 @@ const SeaweedFarmingCalculator: React.FC = () => {
         </div>
       </Section>
 
-
       {/* --- Marketing Section (PART 6 - Single Sale Cycle) --- */}
-      {/* No changes needed here as it's based on per-cycle values */}
        <Section title="PART 6: Seaweed Farming Marketing (Single Sale Cycle)">
-        {/* ... existing table structure ... */}
          <div className="overflow-x-auto">
           <table className="min-w-full border-collapse border text-sm">
-            {/* ... thead ... */}
              <thead className="bg-teal-50">
               <tr>
                 <th className="border p-2 align-bottom" rowSpan={2}>Species</th>
@@ -690,11 +709,9 @@ const SeaweedFarmingCalculator: React.FC = () => {
       </Section>
 
       {/* --- Summary Card --- */}
-      {/* Update explanations */}
       <div className="mt-8 p-4 bg-teal-50 border border-teal-200 rounded-md shadow-sm">
         <h3 className="font-bold mb-4 text-teal-800 border-b border-teal-300 pb-2">Calculation Summary:</h3>
          <div className="mt-4 p-4 bg-white rounded-lg border border-teal-200">
-           {/* ... grid layout for totals (no change needed) ... */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="text-center p-3 bg-yellow-100 rounded shadow-sm border border-yellow-300">
                 <div className="text-sm text-yellow-700 mb-1">Total Income per Sale Cycle</div>
@@ -714,7 +731,6 @@ const SeaweedFarmingCalculator: React.FC = () => {
          </div>
         <ul className="space-y-1 text-sm mt-4 list-disc pl-5 text-gray-700">
           <li><span className="font-medium">Income per Sale Cycle</span> = (Fresh Vol × Fresh Price) + (Dried Vol × Dried Price)</li>
-           {/* Updated explanation */}
           <li><span className="font-medium">Annual Income</span> = Income per Sale Cycle × (Calculated Annual Sales based on Frequency Settings)</li>
           <li>Entering Fresh Vol & Ratio calculates Dried Vol.</li>
           <li>Entering Dried Vol calculates the effective Ratio (based on Fresh Vol).</li>
