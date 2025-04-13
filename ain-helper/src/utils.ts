@@ -11,6 +11,6 @@ export const formatNumber = (num: number | null | undefined, decimals = 2): stri
 };
 
 export const CONFIG = {
-    NUMBER_OF_WEEKS_PER_MONTH: 4,
+    NUMBER_OF_WEEKS_PER_MONTH: 52/12,
     NUMBER_OF_WEEKS_PER_YEAR: 52,
 };
